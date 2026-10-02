@@ -280,8 +280,8 @@ public final class NativeBridge {
         View parent = (View) overlay.getParent();
         int[] location = new int[2];
         parent.getLocationOnScreen(location);
-        // The panel has a 4dp inset inside the overlay for its shadow.
-        return Math.max(0, location[1] + parent.getHeight() - anchorTop + dp(activity, 4));
+        // Account for the panel's 4dp shadow inset to leave a visible 10dp gap.
+        return Math.max(0, location[1] + parent.getHeight() - anchorTop + dp(activity, 6));
     }
 
     private static FrameLayout.LayoutParams expandedParams(Activity activity) {
