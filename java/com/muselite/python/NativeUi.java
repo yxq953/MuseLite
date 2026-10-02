@@ -612,6 +612,9 @@ public final class NativeUi {
                                                            user ? 34 : 0, 0, user ? 0 : 34, 13);
             messageList.addView(card, cardParams);
         }
+        if (NativeBridge.isBrowserVisible()) {
+            NativeBridge.attachTo(activity, messageList);
+        }
         if (nearBottom) messageScroll.post(() -> messageScroll.fullScroll(View.FOCUS_DOWN));
     }
 

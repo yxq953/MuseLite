@@ -663,6 +663,7 @@ class MuseLiteApp(toga.App):
         def run():
             try:
                 self.android.call("show_browser", {"visible": True})
+                self.android.ui_chat(self._native_chat_state())
             except Exception as exc:
                 loop.call_soon_threadsafe(lambda: self._set_status(
                     "浏览器错误：" + str(exc), error=True))

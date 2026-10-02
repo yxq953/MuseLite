@@ -8,6 +8,7 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
+import android.os.Looper;
 import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
@@ -43,6 +44,8 @@ public final class NativeBridge {
     private static final ArrayList<WebView> tabs = new ArrayList<>();
     private static final Map<String, CompletableFuture<String>> pending = new HashMap<>();
     private static FrameLayout overlay;
+    private static LinearLayout browserPanel;
+    private static boolean browserVisible;
     private static int selected = 0;
     private static File workspace;
     private static Activity owner;
@@ -225,21 +228,58 @@ public final class NativeBridge {
     }
 
     private static void show(boolean visible) {
+        browserVisible = visible;
+        if (!visible && browserPanel != null && browserPanel.getParent() != overlay) {
+            if (browserPanel.getParent() instanceof ViewGroup)
+                ((ViewGroup) browserPanel.getParent()).removeView(browserPanel);
+            if (overlay != null) overlay.addView(browserPanel,
+                new FrameLayout.LayoutParams(-1, panelHeight(owner)));
+        }
         overlay.setTranslationX(visible ? 0 : overlay.getResources().getDisplayMetrics().widthPixels + 50);
+    }
+
+    private static int panelHeight(Activity activity) {
+        if (activity == null) return 600;
+        return Math.round(activity.getResources().getDisplayMetrics().heightPixels * 0.64f);
+    }
+
+    public static boolean isBrowserVisible() {
+        return browserVisible && browserPanel != null;
+    }
+
+    /** Attach the live browser to the chat list so it scrolls with the transcript. */
+    public static void attachTo(Activity activity, ViewGroup container) {
+        Runnable task = () -> {
+            if (!isBrowserVisible() || browserPanel.getParent() == container) return;
+            if (browserPanel.getParent() instanceof ViewGroup)
+                ((ViewGroup) browserPanel.getParent()).removeView(browserPanel);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, panelHeight(activity));
+            params.setMargins(0, 0, 0, Math.round(12 * activity.getResources().getDisplayMetrics().density));
+            container.addView(browserPanel, params);
+            if (overlay != null) overlay.setTranslationX(
+                overlay.getResources().getDisplayMetrics().widthPixels + 50);
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) task.run();
+        else {
+            try { ui(activity, () -> { task.run(); return null; }); }
+            catch (Exception ignored) {}
+        }
     }
 
     private static void attachSelected() {
         overlay.removeAllViews();
+        if (browserPanel != null && browserPanel.getParent() instanceof ViewGroup)
+            ((ViewGroup) browserPanel.getParent()).removeView(browserPanel);
         WebView web = tabs.get(selected);
         ViewGroup.LayoutParams previous = web.getLayoutParams();
         int width = previous == null ? -1 : previous.width;
         int height = previous == null ? -1 : previous.height;
         if (web.getParent() instanceof ViewGroup) ((ViewGroup) web.getParent()).removeView(web);
-        LinearLayout panel = new LinearLayout(owner);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setBackgroundColor(Color.WHITE);
-        panel.setElevation(16f);
-        overlay.addView(panel, new FrameLayout.LayoutParams(-1, -1));
+        browserPanel = new LinearLayout(owner);
+        browserPanel.setOrientation(LinearLayout.VERTICAL);
+        browserPanel.setBackgroundColor(Color.WHITE);
+        browserPanel.setElevation(16f);
+        overlay.addView(browserPanel, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout toolbar = new LinearLayout(owner);
         toolbar.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -267,7 +307,7 @@ public final class NativeBridge {
         close.setText("收起");
         close.setOnClickListener(view -> show(false));
         toolbar.addView(close, new LinearLayout.LayoutParams(82 * density, barHeight));
-        panel.addView(toolbar, new LinearLayout.LayoutParams(-1, barHeight));
+        browserPanel.addView(toolbar, new LinearLayout.LayoutParams(-1, barHeight));
 
         LinearLayout.LayoutParams webParams;
         if (height == ViewGroup.LayoutParams.MATCH_PARENT || height <= 0) {
@@ -275,7 +315,7 @@ public final class NativeBridge {
         } else {
             webParams = new LinearLayout.LayoutParams(width, height);
         }
-        panel.addView(web, webParams);
+        browserPanel.addView(web, webParams);
     }
 
     private static WebView createTab(Activity activity) {
