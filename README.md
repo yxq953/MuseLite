@@ -124,6 +124,6 @@ For Android validation, install the generated APK on an Android 11+ arm64 device
 
 ## Native components and licenses
 
-The bundled PRoot loader, PRoot binary, and Alpine root filesystem under `vendor/` are derived from the OpenMinis Android 1.13 release. The source APK SHA-256 is `789253f95475fccfcc88a803a0ec8276777b588f5039be773b9774f4bb3f80c6`. See `LICENSE` and `THIRD_PARTY_LICENSES.md` for project and third-party license information.
+The bundled PRoot loader, PRoot binary, and Alpine root filesystem under `vendor/` are derived from the OpenMinis Android 1.13 release. See `LICENSE` and `THIRD_PARTY_LICENSES.md` for project and third-party license information.
 
 MuseLite is released under the GNU General Public License v3.0. See `LICENSE` for the full text.
