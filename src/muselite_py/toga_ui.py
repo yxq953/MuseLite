@@ -411,7 +411,7 @@ class MuseLiteApp(toga.App):
             return
         for message in self.display_messages[-80:]:
             role = message.get("role")
-            speaker = {"user": "你", "assistant": "MUSELITE", "tool": "工具",
+            speaker = {"user": "USER", "assistant": "MUSELITE", "tool": "工具",
                        "error": "错误", "status": "状态"}.get(role, "消息")
             text = str(message.get("content") or "")
             if not text and message.get("pending"):

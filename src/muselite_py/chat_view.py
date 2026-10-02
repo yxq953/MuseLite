@@ -56,7 +56,7 @@ def render_messages(messages: list[dict]) -> str:
             continue
         if role == "user":
             cards.append(
-                '<article class="message user"><div class="speaker">你</div>'
+                '<article class="message user"><div class="speaker">USER</div>'
                 f'<div class="bubble"><div class="plain">{escape(text)}</div></div></article>'
             )
         elif role == "assistant":

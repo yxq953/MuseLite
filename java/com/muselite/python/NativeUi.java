@@ -615,7 +615,7 @@ public final class NativeUi {
             boolean user = role.equals("user");
             boolean error = role.equals("error");
             boolean tool = role.equals("tool");
-            String speaker = user ? "你" : tool ? message.optString("name", "工具")
+            String speaker = user ? "USER" : tool ? message.optString("name", "工具")
                             : error ? "错误" : role.equals("status") ? "状态" : "MUSELITE";
             LinearLayout card = column(activity);
             card.setPadding(dp(activity, 16), dp(activity, 13), dp(activity, 16), dp(activity, 15));
