@@ -24,20 +24,30 @@ class BrowserBridge(Protocol):
 class BrowserController:
     def __init__(self, bridge: BrowserBridge,
                  on_progress: Callable[[dict[str, Any]], None] | None = None,
-                 on_show: Callable[[], None] | None = None):
+                 on_show: Callable[[], None] | None = None,
+                 on_preview: Callable[[dict[str, Any]], None] | None = None):
         self.bridge = bridge
         self.on_progress = on_progress
         self.on_show = on_show
+        self.on_preview = on_preview
 
     def _emit_progress(self, action: str, result: Any,
                        phase: str = "result") -> None:
-        if self.on_progress is None:
-            return
-        try:
-            self.on_progress({"action": action, "phase": phase, "result": result})
-        except Exception:
-            # Progress is best effort and must never break the browser operation.
-            pass
+        event = {"action": action, "phase": phase, "result": result}
+        if self.on_progress is not None:
+            try:
+                self.on_progress(event)
+            except Exception:
+                # Progress is best effort and must never break the browser operation.
+                pass
+        if phase != "start" and self.on_preview is not None:
+            try:
+                # The compact preview is independent from the chat progress
+                # callback.  It must still update when a browser call is made
+                # outside an active Agent stream.
+                self.on_preview(event)
+            except Exception:
+                pass
 
     def call(self, action: str, params: dict[str, Any],
              cancel: threading.Event | None = None) -> dict[str, Any]:

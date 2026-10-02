@@ -21,6 +21,7 @@ import android.widget.FrameLayout;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.graphics.drawable.GradientDrawable;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
@@ -46,6 +47,8 @@ public final class NativeBridge {
     private static LinearLayout browserPanel;
     private static LinearLayout browserToolbar;
     private static Button expandButton;
+    private static TextView previewText;
+    private static FrameLayout browserContent;
     private static boolean browserVisible;
     private static boolean browserExpanded;
     private static int selected = 0;
@@ -139,6 +142,13 @@ public final class NativeBridge {
                 boolean visible = params.optBoolean("visible", true);
                 ui(activity, () -> { show(visible); return null; });
                 return ok(visible).toString();
+            }
+            if (action.equals("set_browser_preview")) {
+                String title = params.optString("title", "网页结果");
+                String url = params.optString("url", "");
+                String text = params.optString("text", "");
+                ui(activity, () -> { updateBrowserPreview(title, url, text); return null; });
+                return ok(true).toString();
             }
             if (action.equals("new_tab")) {
                 int id = ui(activity, () -> {
@@ -283,6 +293,21 @@ public final class NativeBridge {
             }
         }
         if (expandButton != null) expandButton.setText(expanded ? "收起" : "放大");
+        if (browserContent != null && previewText != null) {
+            previewText.setVisibility(expanded ? View.GONE : View.VISIBLE);
+            if (browserContent.getChildCount() > 0)
+                browserContent.getChildAt(0).setVisibility(expanded ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private static void updateBrowserPreview(String title, String url, String text) {
+        if (previewText == null) return;
+        String summary = text == null ? "" : text.trim().replaceAll("\\s+", " ");
+        if (summary.length() > 160) summary = summary.substring(0, 160) + "…";
+        StringBuilder content = new StringBuilder(title == null || title.isEmpty() ? "网页结果" : title);
+        if (!summary.isEmpty()) content.append("\n").append(summary);
+        else if (url != null && !url.isEmpty()) content.append("\n").append(url);
+        previewText.setText(content.toString());
     }
 
     private static void attachSelected() {
@@ -334,13 +359,27 @@ public final class NativeBridge {
         browserToolbar.addView(close, new LinearLayout.LayoutParams(38 * density, barHeight));
         browserPanel.addView(browserToolbar, new LinearLayout.LayoutParams(-1, barHeight));
 
-        LinearLayout.LayoutParams webParams;
-        if (height == ViewGroup.LayoutParams.MATCH_PARENT || height <= 0) {
-            webParams = new LinearLayout.LayoutParams(width, 0, 1f);
-        } else {
-            webParams = new LinearLayout.LayoutParams(width, height);
-        }
-        browserPanel.addView(web, webParams);
+        browserContent = new FrameLayout(owner);
+        browserContent.setBackgroundColor(Color.WHITE);
+        browserPanel.addView(browserContent, new LinearLayout.LayoutParams(-1, 0, 1f));
+        browserContent.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        previewText = new TextView(owner);
+        previewText.setText("网页预览\n等待网页结果…");
+        previewText.setTextColor(Color.rgb(42, 55, 78));
+        previewText.setTextSize(10);
+        previewText.setMaxLines(4);
+        previewText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        previewText.setPadding(10 * density, 5 * density, 10 * density, 5 * density);
+        previewText.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        GradientDrawable previewBackground = new GradientDrawable();
+        previewBackground.setColor(Color.rgb(247, 250, 255));
+        previewBackground.setStroke(dp(owner, 1), Color.rgb(205, 219, 240));
+        previewBackground.setCornerRadius(dp(owner, 8));
+        previewText.setBackground(previewBackground);
+        previewText.setElevation(dp(owner, 2));
+        previewText.setOnClickListener(view -> setBrowserLayout(owner, true));
+        FrameLayout.LayoutParams previewParams = new FrameLayout.LayoutParams(-1, -1);
+        browserContent.addView(previewText, previewParams);
         web.setOnTouchListener((view, event) -> {
             if (!browserExpanded && event.getAction() == android.view.MotionEvent.ACTION_UP) {
                 setBrowserLayout(owner, true);

@@ -121,6 +121,7 @@ class MuseLiteApp(toga.App):
             self.browser = BrowserController(
                 self.android,
                 on_show=lambda: self.android.call("show_browser", {"visible": True}),
+                on_preview=lambda event: self._update_browser_preview(event),
             )
         else:
             self.sandbox = DesktopSandbox(self.home)
@@ -669,6 +670,35 @@ class MuseLiteApp(toga.App):
                     "浏览器错误：" + str(exc), error=True))
 
         threading.Thread(target=run, daemon=True).start()
+
+    def _update_browser_preview(self, event: dict) -> None:
+        if not self.is_android:
+            return
+        result = event.get("result") if isinstance(event, dict) else None
+        if not isinstance(result, dict):
+            return
+        # AndroidBridge returns the native response envelope.  Browser calls
+        # therefore commonly arrive as {"result": {title, url, text}}.
+        # Unwrap it so the compact card shows the readable page content rather
+        # than the raw JSON envelope.
+        nested = result.get("result")
+        if isinstance(nested, dict):
+            result = nested
+        text = result.get("text", "")
+        if not text and isinstance(result.get("items"), list):
+            text = " · ".join(str(item.get("text", "")) for item in result["items"][:3]
+                              if isinstance(item, dict))
+        if not text:
+            value = result.get("result", "")
+            text = value if isinstance(value, str) else ""
+        try:
+            self.android.call("set_browser_preview", {
+                "title": result.get("title", "网页结果"),
+                "url": result.get("url", ""),
+                "text": text,
+            })
+        except Exception:
+            pass
 
     def show_settings(self):
         self.current_view = "settings"
