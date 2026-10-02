@@ -288,7 +288,7 @@ public final class NativeBridge {
         GradientDrawable outline = new GradientDrawable();
         outline.setColor(Color.TRANSPARENT);
         outline.setStroke(dp(activity, expanded ? 1 : 2),
-            expanded ? Color.rgb(205, 219, 240) : Color.rgb(104, 122, 184));
+            expanded ? Color.rgb(205, 219, 240) : Color.rgb(158, 172, 224));
         outline.setCornerRadius(dp(activity, 6));
         browserPanel.setForeground(outline);
         int toolbarHeight = dp(activity, expanded ? 56 : 0);
