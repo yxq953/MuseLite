@@ -8,7 +8,6 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
-import android.os.Looper;
 import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
@@ -45,7 +44,10 @@ public final class NativeBridge {
     private static final Map<String, CompletableFuture<String>> pending = new HashMap<>();
     private static FrameLayout overlay;
     private static LinearLayout browserPanel;
+    private static LinearLayout browserToolbar;
+    private static Button expandButton;
     private static boolean browserVisible;
+    private static boolean browserExpanded;
     private static int selected = 0;
     private static File workspace;
     private static Activity owner;
@@ -216,9 +218,7 @@ public final class NativeBridge {
                 for (WebView tab : tabs) tab.destroy();
                 tabs.clear(); owner = activity; selected = 0;
                 overlay = new FrameLayout(activity);
-                int panelHeight = Math.round(activity.getResources().getDisplayMetrics().heightPixels * 0.64f);
-                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(-1, panelHeight);
-                params.gravity = android.view.Gravity.TOP;
+                FrameLayout.LayoutParams params = miniParams(activity);
                 activity.addContentView(overlay, params);
                 overlay.setElevation(24f);
                 tabs.add(createTab(activity)); attachSelected(); show(false);
@@ -229,41 +229,60 @@ public final class NativeBridge {
 
     private static void show(boolean visible) {
         browserVisible = visible;
-        if (!visible && browserPanel != null && browserPanel.getParent() != overlay) {
-            if (browserPanel.getParent() instanceof ViewGroup)
-                ((ViewGroup) browserPanel.getParent()).removeView(browserPanel);
-            if (overlay != null) overlay.addView(browserPanel,
-                new FrameLayout.LayoutParams(-1, panelHeight(owner)));
-        }
+        if (visible) setBrowserLayout(owner, browserExpanded);
         overlay.setTranslationX(visible ? 0 : overlay.getResources().getDisplayMetrics().widthPixels + 50);
     }
 
-    private static int panelHeight(Activity activity) {
-        if (activity == null) return 600;
-        return Math.round(activity.getResources().getDisplayMetrics().heightPixels * 0.64f);
+    private static int dp(Activity activity, int value) {
+        return Math.round(value * activity.getResources().getDisplayMetrics().density);
     }
 
-    public static boolean isBrowserVisible() {
-        return browserVisible && browserPanel != null;
+    private static FrameLayout.LayoutParams miniParams(Activity activity) {
+        int width = Math.round(activity.getResources().getDisplayMetrics().widthPixels * 0.30f);
+        FrameLayout.LayoutParams result = new FrameLayout.LayoutParams(width, dp(activity, 72));
+        result.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.LEFT;
+        result.leftMargin = dp(activity, 12);
+        result.bottomMargin = dp(activity, 184);
+        return result;
     }
 
-    /** Attach the live browser to the chat list so it scrolls with the transcript. */
-    public static void attachTo(Activity activity, ViewGroup container) {
-        Runnable task = () -> {
-            if (!isBrowserVisible() || browserPanel.getParent() == container) return;
-            if (browserPanel.getParent() instanceof ViewGroup)
-                ((ViewGroup) browserPanel.getParent()).removeView(browserPanel);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, panelHeight(activity));
-            params.setMargins(0, 0, 0, Math.round(12 * activity.getResources().getDisplayMetrics().density));
-            container.addView(browserPanel, params);
-            if (overlay != null) overlay.setTranslationX(
-                overlay.getResources().getDisplayMetrics().widthPixels + 50);
-        };
-        if (Looper.myLooper() == Looper.getMainLooper()) task.run();
-        else {
-            try { ui(activity, () -> { task.run(); return null; }); }
-            catch (Exception ignored) {}
+    private static FrameLayout.LayoutParams expandedParams(Activity activity) {
+        int height = Math.round(activity.getResources().getDisplayMetrics().heightPixels * 0.58f);
+        FrameLayout.LayoutParams result = new FrameLayout.LayoutParams(-1, height);
+        result.gravity = android.view.Gravity.TOP;
+        return result;
+    }
+
+    private static void setBrowserLayout(Activity activity, boolean expanded) {
+        if (activity == null || overlay == null || browserPanel == null) return;
+        browserExpanded = expanded;
+        ViewGroup.LayoutParams current = overlay.getLayoutParams();
+        ViewGroup.LayoutParams next = expanded ? expandedParams(activity) : miniParams(activity);
+        current.width = next.width;
+        current.height = next.height;
+        if (current instanceof FrameLayout.LayoutParams && next instanceof FrameLayout.LayoutParams) {
+            FrameLayout.LayoutParams from = (FrameLayout.LayoutParams) current;
+            FrameLayout.LayoutParams to = (FrameLayout.LayoutParams) next;
+            from.gravity = to.gravity;
+            from.leftMargin = to.leftMargin;
+            from.topMargin = to.topMargin;
+            from.rightMargin = to.rightMargin;
+            from.bottomMargin = to.bottomMargin;
         }
+        overlay.setLayoutParams(current);
+        int toolbarHeight = dp(activity, expanded ? 56 : 32);
+        if (browserToolbar != null) {
+            ViewGroup.LayoutParams toolbarParams = browserToolbar.getLayoutParams();
+            toolbarParams.height = toolbarHeight;
+            browserToolbar.setLayoutParams(toolbarParams);
+            for (int i = 0; i < browserToolbar.getChildCount(); i++) {
+                View child = browserToolbar.getChildAt(i);
+                ViewGroup.LayoutParams childParams = child.getLayoutParams();
+                childParams.height = toolbarHeight;
+                child.setLayoutParams(childParams);
+            }
+        }
+        if (expandButton != null) expandButton.setText(expanded ? "收起" : "放大");
     }
 
     private static void attachSelected() {
@@ -281,33 +300,39 @@ public final class NativeBridge {
         browserPanel.setElevation(16f);
         overlay.addView(browserPanel, new FrameLayout.LayoutParams(-1, -1));
 
-        LinearLayout toolbar = new LinearLayout(owner);
-        toolbar.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        browserToolbar = new LinearLayout(owner);
+        browserToolbar.setGravity(android.view.Gravity.CENTER_VERTICAL);
         int density = Math.round(owner.getResources().getDisplayMetrics().density);
         int barHeight = 56 * density;
-        toolbar.setPadding(18 * density, 0, 8 * density, 0);
-        toolbar.setBackgroundColor(Color.WHITE);
+        browserToolbar.setPadding(12 * density, 0, 4 * density, 0);
+        browserToolbar.setBackgroundColor(Color.WHITE);
         TextView title = new TextView(owner);
-        title.setText("浏览器 · 可手动点击和拖动");
+        title.setText("网页预览");
         title.setTextColor(Color.rgb(42, 55, 78));
-        title.setTextSize(14);
+        title.setTextSize(12);
         title.setSingleLine(true);
-        toolbar.addView(title, new LinearLayout.LayoutParams(0, barHeight, 1f));
+        browserToolbar.addView(title, new LinearLayout.LayoutParams(0, barHeight, 1f));
         Button back = new Button(owner);
         back.setText("‹");
-        back.setTextSize(22);
+        back.setTextSize(18);
         back.setOnClickListener(view -> { if (web.canGoBack()) web.goBack(); });
-        toolbar.addView(back, new LinearLayout.LayoutParams(58 * density, barHeight));
+        browserToolbar.addView(back, new LinearLayout.LayoutParams(38 * density, barHeight));
         Button forward = new Button(owner);
         forward.setText("›");
-        forward.setTextSize(22);
+        forward.setTextSize(18);
         forward.setOnClickListener(view -> { if (web.canGoForward()) web.goForward(); });
-        toolbar.addView(forward, new LinearLayout.LayoutParams(58 * density, barHeight));
+        browserToolbar.addView(forward, new LinearLayout.LayoutParams(38 * density, barHeight));
+        expandButton = new Button(owner);
+        expandButton.setText("放大");
+        expandButton.setTextSize(11);
+        expandButton.setOnClickListener(view -> setBrowserLayout(owner, browserExpanded ? false : true));
+        browserToolbar.addView(expandButton, new LinearLayout.LayoutParams(56 * density, barHeight));
         Button close = new Button(owner);
-        close.setText("收起");
+        close.setText("×");
+        close.setTextSize(18);
         close.setOnClickListener(view -> show(false));
-        toolbar.addView(close, new LinearLayout.LayoutParams(82 * density, barHeight));
-        browserPanel.addView(toolbar, new LinearLayout.LayoutParams(-1, barHeight));
+        browserToolbar.addView(close, new LinearLayout.LayoutParams(38 * density, barHeight));
+        browserPanel.addView(browserToolbar, new LinearLayout.LayoutParams(-1, barHeight));
 
         LinearLayout.LayoutParams webParams;
         if (height == ViewGroup.LayoutParams.MATCH_PARENT || height <= 0) {
@@ -316,6 +341,14 @@ public final class NativeBridge {
             webParams = new LinearLayout.LayoutParams(width, height);
         }
         browserPanel.addView(web, webParams);
+        web.setOnTouchListener((view, event) -> {
+            if (!browserExpanded && event.getAction() == android.view.MotionEvent.ACTION_UP) {
+                setBrowserLayout(owner, true);
+                return true;
+            }
+            return false;
+        });
+        setBrowserLayout(owner, browserExpanded);
     }
 
     private static WebView createTab(Activity activity) {
