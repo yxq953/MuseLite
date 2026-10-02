@@ -242,11 +242,6 @@ public final class NativeBridge {
         browserVisible = visible;
         if (visible) setBrowserLayout(owner, browserExpanded);
         overlay.setTranslationX(visible ? 0 : overlay.getResources().getDisplayMetrics().widthPixels + 50);
-        NativeUi.setBrowserPreviewVisible(owner, isCompactPreviewVisible(owner));
-    }
-
-    static boolean isCompactPreviewVisible(Activity activity) {
-        return owner == activity && browserVisible && !browserExpanded;
     }
 
     static void onScreenChanged(boolean chat) {
@@ -280,13 +275,13 @@ public final class NativeBridge {
     }
 
     private static int previewBottomMargin(Activity activity) {
-        int inputTop = NativeUi.composerInputTopOnScreen(activity);
-        if (inputTop < 0 || overlay == null || overlay.getParent() == null) return dp(activity, 160);
+        int anchorTop = NativeUi.previewAnchorTopOnScreen(activity);
+        if (anchorTop < 0 || overlay == null || overlay.getParent() == null) return dp(activity, 160);
         View parent = (View) overlay.getParent();
         int[] location = new int[2];
         parent.getLocationOnScreen(location);
         // The panel has a 4dp inset inside the overlay for its shadow.
-        return Math.max(0, location[1] + parent.getHeight() - inputTop + dp(activity, 4));
+        return Math.max(0, location[1] + parent.getHeight() - anchorTop + dp(activity, 4));
     }
 
     private static FrameLayout.LayoutParams expandedParams(Activity activity) {
@@ -299,7 +294,6 @@ public final class NativeBridge {
     private static void setBrowserLayout(Activity activity, boolean expanded) {
         if (activity == null || overlay == null || browserPanel == null) return;
         browserExpanded = expanded;
-        NativeUi.setBrowserPreviewVisible(activity, isCompactPreviewVisible(activity));
         ViewGroup.LayoutParams current = overlay.getLayoutParams();
         ViewGroup.LayoutParams next = expanded ? expandedParams(activity) : miniParams(activity);
         current.width = next.width;
