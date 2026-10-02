@@ -1,0 +1,5 @@
+<resources>
+    <string name="formal_name">"{{ cookiecutter.formal_name }}"</string>
+    <string name="app_name">{{ cookiecutter.app_name }}</string>
+    <string name="phone_accessibility_description">Allow MuseLite to read the screen and perform taps, typing, and swipes when enabled by the user.</string>
+</resources>

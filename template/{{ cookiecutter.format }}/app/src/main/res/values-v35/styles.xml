@@ -1,0 +1,9 @@
+<resources>
+    <!-- Disable edge to edge layout. This will have no effect when targetSdk is 36
+    or higher. -->
+    <style name="AppTheme.V35" parent="AppTheme.Base">
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+
+    <style name="AppTheme" parent="AppTheme.V35"/>
+</resources>

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Android/Gradle/build outputs
+build/
+cache/
+logs/
+dist/
+temp/
+*.apk
+*.aab
+
+# Local/editor files
+.vscode/
+.idea/
+*.iml
+
+# Local app data
+*.sqlite3
+
+# Large generated/archive files
+template-*.zip

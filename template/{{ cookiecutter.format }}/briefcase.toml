@@ -1,0 +1,34 @@
+# Generated using Python {{ cookiecutter.python_version }}
+[briefcase]
+target_version = "0.3.27"
+
+[paths]
+app_path = "app/src/main/python"
+app_requirements_path = "app/requirements.txt"
+app_requirement_installer_args_path = "app/pip-options.txt"
+metadata_resource_path = "app/src/main/res/values/briefcase.xml"
+extract_packages_path = "app/extract-packages.txt"
+
+icon.round.48 = "app/src/main/res/mipmap-mdpi/ic_launcher_round.png"
+icon.round.72 = "app/src/main/res/mipmap-hdpi/ic_launcher_round.png"
+icon.round.96 = "app/src/main/res/mipmap-xhdpi/ic_launcher_round.png"
+icon.round.144 = "app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png"
+icon.round.192 = "app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png"
+
+icon.square.48 = "app/src/main/res/mipmap-mdpi/ic_launcher.png"
+icon.square.72 = "app/src/main/res/mipmap-hdpi/ic_launcher.png"
+icon.square.96 = "app/src/main/res/mipmap-xhdpi/ic_launcher.png"
+icon.square.144 = "app/src/main/res/mipmap-xxhdpi/ic_launcher.png"
+icon.square.192 = "app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
+
+icon.square.320 = "app/src/main/res/mipmap-mdpi/splash.png"
+icon.square.480 = "app/src/main/res/mipmap-hdpi/splash.png"
+icon.square.640 = "app/src/main/res/mipmap-xhdpi/splash.png"
+icon.square.960 = "app/src/main/res/mipmap-xxhdpi/splash.png"
+icon.square.1280 = "app/src/main/res/mipmap-xxxhdpi/splash.png"
+
+icon.adaptive.108 = "app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png"
+icon.adaptive.162 = "app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png"
+icon.adaptive.216 = "app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png"
+icon.adaptive.324 = "app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png"
+icon.adaptive.432 = "app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png"

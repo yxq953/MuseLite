@@ -1,0 +1,7 @@
+tmp
+*~
+.vscode
+.idea
+.project
+.settings
+.classpath

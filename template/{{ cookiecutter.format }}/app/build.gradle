@@ -1,0 +1,79 @@
+apply plugin: 'com.android.application'
+apply plugin: 'com.chaquo.python'
+
+android {
+    // This number should generally be kept up to date with
+    // the most recent supported Android release.
+    compileSdkVersion {{ cookiecutter.target_os_version }}
+
+    namespace "{{ cookiecutter.package_name }}.{{ cookiecutter.module_name }}"
+
+    defaultConfig {
+        applicationId "{{ cookiecutter.package_name }}.{{ cookiecutter.module_name }}"
+        versionCode {{ cookiecutter.version_code }}
+        versionName "{{ cookiecutter.version }}"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // Briefcase currently requires API Level 24 for the `pidof` command, and the `--pid`
+        // argument to `adb logcat`. This supports over 97% of active devices (as of sept 2024).
+        minSdkVersion {{ cookiecutter.min_os_version }}
+        // This should generally match the compileSDKVersion from above.
+        targetSdkVersion {{ cookiecutter.target_os_version }}
+
+        python {
+            version "{{ cookiecutter.python_version|py_tag }}"
+
+            pip {
+                install "-r", "requirements.txt"
+
+                def f = new File(project.projectDir, "pip-options.txt")
+                def pipOptions = f.getText("utf-8").split("\n")
+                pipOptions = pipOptions.findAll { !it.isBlank() }
+                options(*pipOptions)
+            }
+            def f = new File(project.projectDir, "extract-packages.txt")
+            def packages = f.readLines("utf-8")
+                        .collect { it.trim() }
+                        .findAll { !it.isBlank() }
+            extractPackages(*packages)
+        }
+        ndk {
+            {% if cookiecutter.ndk.abi_filters %}
+            abiFilters {% for abi in cookiecutter.ndk.abi_filters %}"{{ abi }}"{% if not loop.last %}, {% endif %}{% endfor %}
+
+            {% elif cookiecutter.python_version|py_tag in ["3.9", "3.10", "3.11"] %}
+            // Chaquopy also supports x86, but it's not very useful anymore, so we'll
+            // disable it to speed up the build.
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
+            {% else %}
+            // For this Python version, only 64-bit ABIs are available.
+            abiFilters "arm64-v8a", "x86_64"
+            {% endif %}
+        }
+    }
+
+    compileOptions {
+      sourceCompatibility JavaVersion.VERSION_1_8
+      targetCompatibility JavaVersion.VERSION_1_8
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation "androidx.appcompat:appcompat:1.7.1"
+
+{%- if cookiecutter.build_gradle_dependencies -%}
+{%- for lib in cookiecutter.build_gradle_dependencies.implementation %}
+    implementation "{{ lib }}"
+{%- endfor %}
+{% endif -%}
+}
+
+// ========== START USER PROVIDED CONTENT ==========
+{{ cookiecutter.build_gradle_extra_content }}
