@@ -19,6 +19,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
@@ -211,8 +213,11 @@ public final class NativeBridge {
                 for (WebView tab : tabs) tab.destroy();
                 tabs.clear(); owner = activity; selected = 0;
                 overlay = new FrameLayout(activity);
-                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(-1, -1);
+                int panelHeight = Math.round(activity.getResources().getDisplayMetrics().heightPixels * 0.64f);
+                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(-1, panelHeight);
+                params.gravity = android.view.Gravity.TOP;
                 activity.addContentView(overlay, params);
+                overlay.setElevation(24f);
                 tabs.add(createTab(activity)); attachSelected(); show(false);
             }
             return null;
@@ -230,13 +235,47 @@ public final class NativeBridge {
         int width = previous == null ? -1 : previous.width;
         int height = previous == null ? -1 : previous.height;
         if (web.getParent() instanceof ViewGroup) ((ViewGroup) web.getParent()).removeView(web);
-        overlay.addView(web, new FrameLayout.LayoutParams(width, height));
+        LinearLayout panel = new LinearLayout(owner);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setBackgroundColor(Color.WHITE);
+        panel.setElevation(16f);
+        overlay.addView(panel, new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout toolbar = new LinearLayout(owner);
+        toolbar.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        int density = Math.round(owner.getResources().getDisplayMetrics().density);
+        int barHeight = 56 * density;
+        toolbar.setPadding(18 * density, 0, 8 * density, 0);
+        toolbar.setBackgroundColor(Color.WHITE);
+        TextView title = new TextView(owner);
+        title.setText("浏览器 · 可手动点击和拖动");
+        title.setTextColor(Color.rgb(42, 55, 78));
+        title.setTextSize(14);
+        title.setSingleLine(true);
+        toolbar.addView(title, new LinearLayout.LayoutParams(0, barHeight, 1f));
+        Button back = new Button(owner);
+        back.setText("‹");
+        back.setTextSize(22);
+        back.setOnClickListener(view -> { if (web.canGoBack()) web.goBack(); });
+        toolbar.addView(back, new LinearLayout.LayoutParams(58 * density, barHeight));
+        Button forward = new Button(owner);
+        forward.setText("›");
+        forward.setTextSize(22);
+        forward.setOnClickListener(view -> { if (web.canGoForward()) web.goForward(); });
+        toolbar.addView(forward, new LinearLayout.LayoutParams(58 * density, barHeight));
         Button close = new Button(owner);
-        close.setText("×");
+        close.setText("收起");
         close.setOnClickListener(view -> show(false));
-        FrameLayout.LayoutParams controls = new FrameLayout.LayoutParams(110, 110);
-        controls.gravity = android.view.Gravity.TOP | android.view.Gravity.RIGHT;
-        overlay.addView(close, controls);
+        toolbar.addView(close, new LinearLayout.LayoutParams(82 * density, barHeight));
+        panel.addView(toolbar, new LinearLayout.LayoutParams(-1, barHeight));
+
+        LinearLayout.LayoutParams webParams;
+        if (height == ViewGroup.LayoutParams.MATCH_PARENT || height <= 0) {
+            webParams = new LinearLayout.LayoutParams(width, 0, 1f);
+        } else {
+            webParams = new LinearLayout.LayoutParams(width, height);
+        }
+        panel.addView(web, webParams);
     }
 
     private static WebView createTab(Activity activity) {

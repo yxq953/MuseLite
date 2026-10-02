@@ -55,6 +55,51 @@ def display_text(content) -> str:
     return json.dumps(content, ensure_ascii=False)
 
 
+def browser_progress_text(event: dict) -> str:
+    """Turn an in-flight browser result into a compact live tool transcript."""
+    labels = {
+        "navigate": "打开网页",
+        "get_readable": "读取网页正文",
+        "get_text": "读取网页文本",
+        "get_page_info": "读取网页信息",
+        "find_elements": "查找可交互元素",
+        "click": "点击网页元素",
+        "type": "输入网页内容",
+        "scroll": "滚动网页",
+        "scroll_and_collect": "滚动并收集内容",
+        "screenshot": "获取网页截图",
+        "execute_js": "执行网页脚本",
+        "wait_for_dom_stable": "等待网页稳定",
+        "fetch": "读取网页资源",
+    }
+    action = str(event.get("action", "browser_use"))
+    label_text = labels.get(action, action)
+    if event.get("phase") == "start":
+        return "浏览器 · " + label_text + "…"
+    result = event.get("result")
+    if not isinstance(result, dict):
+        return "浏览器 · " + label_text + "\n" + str(result or "已完成")
+    lines = []
+    title = result.get("title")
+    url = result.get("url")
+    if title:
+        lines.append("标题：" + str(title))
+    if url:
+        lines.append("地址：" + str(url))
+    readable = result.get("text")
+    if isinstance(readable, str) and readable.strip():
+        lines.append(readable.strip())
+    items = result.get("items")
+    if isinstance(items, list) and items:
+        for item in items[:8]:
+            if isinstance(item, dict) and item.get("text"):
+                lines.append("• " + str(item["text"]).strip())
+    if not lines:
+        summary = json.dumps(result, ensure_ascii=False, separators=(", ", ": "))
+        lines.append(summary)
+    return "浏览器 · " + label_text + "\n" + "\n".join(lines)[:3200]
+
+
 class MuseLiteApp(toga.App):
     def startup(self):
         self.is_android = toga.platform.current_platform == "android"
@@ -73,7 +118,10 @@ class MuseLiteApp(toga.App):
                 self.android.call("configure", {"workspace": str(self.sandbox.workspace)})
             except Exception as exc:
                 self.startup_error = str(exc)
-            self.browser = BrowserController(self.android)
+            self.browser = BrowserController(
+                self.android,
+                on_show=lambda: self.android.call("show_browser", {"visible": True}),
+            )
         else:
             self.sandbox = DesktopSandbox(self.home)
             self.browser = None
@@ -562,6 +610,12 @@ class MuseLiteApp(toga.App):
             self._stream_index = None
             self._add_display("tool", "正在执行…", name=str(value), pending=True)
             self._set_status("正在运行 " + str(value) + "…")
+        elif name == "tool_progress":
+            for message in reversed(self.display_messages):
+                if message["role"] == "tool" and message.get("pending"):
+                    message["content"] = browser_progress_text(value)
+                    break
+            self._schedule_render()
         elif name == "tool_result":
             for message in reversed(self.display_messages):
                 if message["role"] == "tool" and message.get("pending"):

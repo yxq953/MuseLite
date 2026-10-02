@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 
 ACTIONS = (
@@ -22,8 +22,22 @@ class BrowserBridge(Protocol):
 
 
 class BrowserController:
-    def __init__(self, bridge: BrowserBridge):
+    def __init__(self, bridge: BrowserBridge,
+                 on_progress: Callable[[dict[str, Any]], None] | None = None,
+                 on_show: Callable[[], None] | None = None):
         self.bridge = bridge
+        self.on_progress = on_progress
+        self.on_show = on_show
+
+    def _emit_progress(self, action: str, result: Any,
+                       phase: str = "result") -> None:
+        if self.on_progress is None:
+            return
+        try:
+            self.on_progress({"action": action, "phase": phase, "result": result})
+        except Exception:
+            # Progress is best effort and must never break the browser operation.
+            pass
 
     def call(self, action: str, params: dict[str, Any],
              cancel: threading.Event | None = None) -> dict[str, Any]:
@@ -31,13 +45,26 @@ class BrowserController:
             raise InterruptedError("浏览器操作已取消")
         if action not in ACTIONS:
             raise ValueError(f"不支持的浏览器操作：{action}")
+        # Keep the live page available for the user while the Agent works. The
+        # Android implementation renders this as a touch-friendly bottom panel.
+        if action != "show_browser" and self.on_show is not None:
+            try:
+                self.on_show()
+            except Exception:
+                pass
+        self._emit_progress(action, None, "start")
         if action == "scroll_and_collect":
-            return self._scroll_and_collect(params, cancel)
+            result = self._scroll_and_collect(params, cancel)
+            self._emit_progress(action, result)
+            return result
         if action == "wait_for_dom_stable":
-            return self._wait_for_dom_stable(params, cancel)
+            result = self._wait_for_dom_stable(params, cancel)
+            self._emit_progress(action, result)
+            return result
         result = self.bridge.call(action, params)
         if cancel is not None and cancel.is_set():
             raise InterruptedError("浏览器操作已取消")
+        self._emit_progress(action, result)
         return result
 
     def _scroll_and_collect(self, params: dict[str, Any],
@@ -47,20 +74,29 @@ class BrowserController:
             raise ValueError("scroll_and_collect 需要 item_selector")
         count = min(max(int(params.get("scroll_count", 5)), 1), 50)
         seen: dict[str, dict[str, str]] = {}
-        for _ in range(count):
+        for _scroll_index in range(count):
             if cancel is not None and cancel.is_set():
                 raise InterruptedError("浏览器操作已取消")
             script = """return Array.from(document.querySelectorAll(%s)).map((e) =>
                 ({text:(e.innerText||'').trim(),html:e.outerHTML.slice(0,3000)}))""" % json.dumps(selector)
             result = self.bridge.call("execute_js", {**params, "script": script})
+            self._emit_progress("scroll_and_collect", {
+                "phase": "collect", "items": result.get("result") or [],
+                "scroll": _scroll_index,
+            })
             for item in result.get("result") or []:
                 if not isinstance(item, dict):
                     continue
                 key = item.get("text") or item.get("html")
                 if key:
                     seen[key] = item
-            self.bridge.call("scroll", {**params, "direction": "down",
-                                        "amount": params.get("amount", 500)})
+            scroll_result = self.bridge.call(
+                "scroll", {**params, "direction": "down",
+                            "amount": params.get("amount", 500)})
+            self._emit_progress("scroll_and_collect", {
+                "phase": "scroll", "scroll": _scroll_index,
+                "result": scroll_result,
+            })
             if cancel is not None:
                 if cancel.wait(0.4):
                     raise InterruptedError("浏览器操作已取消")

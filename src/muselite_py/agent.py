@@ -41,6 +41,9 @@ class Agent:
             on_event: Callable[[str, Any], None] | None = None) -> None:
         emit = on_event or (lambda _name, _value: None)
         self.cancel.clear()
+        # Browser progress is emitted while the synchronous tool call is still
+        # running, so the UI can show retrieved content before the model replies.
+        self.tools.on_progress = lambda value: emit("tool_progress", value)
         text = user_text.strip()
         if not text:
             raise ValueError("消息不能为空")

@@ -71,10 +71,16 @@ TOOL_SCHEMAS = [
 
 class ToolExecutor:
     def __init__(self, sandbox: ProotSandbox, browser: BrowserController | None,
-                 phone: PhoneController | None = None):
+                 phone: PhoneController | None = None,
+                 on_progress=None):
         self.sandbox = sandbox
         self.browser = browser
         self.phone = phone
+        self.on_progress = on_progress
+
+    def _browser_progress(self, event: dict[str, Any]) -> None:
+        if self.on_progress is not None:
+            self.on_progress(event)
 
     @property
     def schemas(self) -> list[dict]:
@@ -140,6 +146,7 @@ class ToolExecutor:
         if name == "browser_use":
             if self.browser is None:
                 raise RuntimeError("浏览器仅在 Android 中可用")
+            self.browser.on_progress = self._browser_progress
             return self.browser.call(args["action"], args, cancel)
         if name == "phone_use":
             if self.phone is None:
