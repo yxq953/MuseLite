@@ -223,6 +223,7 @@ public final class NativeUi {
                 ensure(activity);
                 JSONObject state = new JSONObject(stateJson);
                 screen = state.optString("view", "sessions");
+                NativeBridge.onScreenChanged(screen.equals("chat"));
                 currentSessionId = state.optString("session_id", "");
                 currentSessionTitle = state.optString("title", "定时任务");
                 host.removeAllViews();
@@ -536,6 +537,26 @@ public final class NativeUi {
             outer.addView(actions);
         }
         page.addView(outer, new LinearLayout.LayoutParams(-1, -2));
+        if (screen.equals("chat")) {
+            page.addOnLayoutChangeListener((view, left, top, right, bottom,
+                                            oldLeft, oldTop, oldRight, oldBottom) ->
+                NativeBridge.positionPreview(activity));
+            composerInput.addOnLayoutChangeListener((view, left, top, right, bottom,
+                                                     oldLeft, oldTop, oldRight, oldBottom) ->
+                NativeBridge.positionPreview(activity));
+        }
+    }
+
+    static int composerInputTopOnScreen(Activity activity) {
+        if (owner != activity || !screen.equals("chat") || composerInput == null ||
+                !composerInput.isAttachedToWindow() || composerInput.getHeight() <= 0) return -1;
+        int[] location = new int[2];
+        composerInput.getLocationOnScreen(location);
+        return location[1];
+    }
+
+    static boolean isChatScreen(Activity activity) {
+        return owner == activity && screen.equals("chat");
     }
 
     private static void renderMessages(Activity activity, JSONArray messages) {

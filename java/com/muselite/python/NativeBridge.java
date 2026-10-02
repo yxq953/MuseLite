@@ -238,9 +238,27 @@ public final class NativeBridge {
     }
 
     private static void show(boolean visible) {
+        if (visible && !NativeUi.isChatScreen(owner)) visible = false;
         browserVisible = visible;
         if (visible) setBrowserLayout(owner, browserExpanded);
         overlay.setTranslationX(visible ? 0 : overlay.getResources().getDisplayMetrics().widthPixels + 50);
+    }
+
+    static void onScreenChanged(boolean chat) {
+        if (chat || overlay == null) return;
+        show(false);
+        browserExpanded = false;
+        setBrowserLayout(owner, false);
+    }
+
+    static void positionPreview(Activity activity) {
+        if (!browserVisible || browserExpanded || owner != activity || overlay == null) return;
+        int bottomMargin = previewBottomMargin(activity);
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) overlay.getLayoutParams();
+        if (params.bottomMargin != bottomMargin) {
+            params.bottomMargin = bottomMargin;
+            overlay.setLayoutParams(params);
+        }
     }
 
     private static int dp(Activity activity, int value) {
@@ -252,8 +270,17 @@ public final class NativeBridge {
         FrameLayout.LayoutParams result = new FrameLayout.LayoutParams(width, dp(activity, 68));
         result.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.LEFT;
         result.leftMargin = dp(activity, 12);
-        result.bottomMargin = dp(activity, 160);
+        result.bottomMargin = previewBottomMargin(activity);
         return result;
+    }
+
+    private static int previewBottomMargin(Activity activity) {
+        int inputTop = NativeUi.composerInputTopOnScreen(activity);
+        if (inputTop < 0 || overlay == null || overlay.getParent() == null) return dp(activity, 160);
+        View parent = (View) overlay.getParent();
+        int[] location = new int[2];
+        parent.getLocationOnScreen(location);
+        return Math.max(0, location[1] + parent.getHeight() - inputTop + dp(activity, 8));
     }
 
     private static FrameLayout.LayoutParams expandedParams(Activity activity) {
