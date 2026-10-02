@@ -252,7 +252,7 @@ public final class NativeBridge {
         FrameLayout.LayoutParams result = new FrameLayout.LayoutParams(width, dp(activity, 60));
         result.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.LEFT;
         result.leftMargin = dp(activity, 12);
-        result.bottomMargin = dp(activity, 184);
+        result.bottomMargin = dp(activity, 172);
         return result;
     }
 
@@ -280,6 +280,17 @@ public final class NativeBridge {
             from.bottomMargin = to.bottomMargin;
         }
         overlay.setLayoutParams(current);
+        FrameLayout.LayoutParams panelParams = (FrameLayout.LayoutParams) browserPanel.getLayoutParams();
+        int inset = expanded ? 0 : dp(activity, 4);
+        panelParams.setMargins(inset, inset, inset, inset);
+        browserPanel.setLayoutParams(panelParams);
+        browserPanel.setElevation(dp(activity, expanded ? 3 : 9));
+        GradientDrawable outline = new GradientDrawable();
+        outline.setColor(Color.TRANSPARENT);
+        outline.setStroke(dp(activity, expanded ? 1 : 2),
+            expanded ? Color.rgb(205, 219, 240) : Color.rgb(130, 136, 145));
+        outline.setCornerRadius(dp(activity, 6));
+        browserPanel.setForeground(outline);
         int toolbarHeight = dp(activity, expanded ? 56 : 0);
         if (browserToolbar != null) {
             browserToolbar.setVisibility(expanded ? View.VISIBLE : View.GONE);
