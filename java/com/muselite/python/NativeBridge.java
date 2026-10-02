@@ -249,10 +249,10 @@ public final class NativeBridge {
 
     private static FrameLayout.LayoutParams miniParams(Activity activity) {
         int width = Math.round(activity.getResources().getDisplayMetrics().widthPixels * 0.24f);
-        FrameLayout.LayoutParams result = new FrameLayout.LayoutParams(width, dp(activity, 60));
+        FrameLayout.LayoutParams result = new FrameLayout.LayoutParams(width, dp(activity, 68));
         result.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.LEFT;
         result.leftMargin = dp(activity, 12);
-        result.bottomMargin = dp(activity, 172);
+        result.bottomMargin = dp(activity, 160);
         return result;
     }
 
@@ -318,7 +318,7 @@ public final class NativeBridge {
                 int pageWidth = activity.getResources().getDisplayMetrics().widthPixels;
                 float scale = (float) miniWidth / pageWidth;
                 webParams.width = pageWidth;
-                webParams.height = Math.round(dp(activity, 60) / scale);
+                webParams.height = Math.round(dp(activity, 68) / scale);
                 web.setPivotX(0f);
                 web.setPivotY(0f);
                 web.setScaleX(scale);
