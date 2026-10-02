@@ -242,6 +242,11 @@ public final class NativeBridge {
         browserVisible = visible;
         if (visible) setBrowserLayout(owner, browserExpanded);
         overlay.setTranslationX(visible ? 0 : overlay.getResources().getDisplayMetrics().widthPixels + 50);
+        NativeUi.setBrowserPreviewVisible(owner, isCompactPreviewVisible(owner));
+    }
+
+    static boolean isCompactPreviewVisible(Activity activity) {
+        return owner == activity && browserVisible && !browserExpanded;
     }
 
     static void onScreenChanged(boolean chat) {
@@ -294,6 +299,7 @@ public final class NativeBridge {
     private static void setBrowserLayout(Activity activity, boolean expanded) {
         if (activity == null || overlay == null || browserPanel == null) return;
         browserExpanded = expanded;
+        NativeUi.setBrowserPreviewVisible(activity, isCompactPreviewVisible(activity));
         ViewGroup.LayoutParams current = overlay.getLayoutParams();
         ViewGroup.LayoutParams next = expanded ? expandedParams(activity) : miniParams(activity);
         current.width = next.width;

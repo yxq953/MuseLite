@@ -477,6 +477,7 @@ public final class NativeUi {
         statusView.setPadding(dp(activity, 10), dp(activity, 6),
                               dp(activity, 10), dp(activity, 6));
         outer.addView(statusView, margins(activity, -1, -2, 0, 0, 0, 8));
+        setBrowserPreviewVisible(activity, NativeBridge.isCompactPreviewVisible(activity));
         status(state.optString("status", ""), state.optBoolean("status_error", false));
 
         LinearLayout inputRow = row(activity);
@@ -557,6 +558,16 @@ public final class NativeUi {
 
     static boolean isChatScreen(Activity activity) {
         return owner == activity && screen.equals("chat");
+    }
+
+    static void setBrowserPreviewVisible(Activity activity, boolean visible) {
+        if (!isChatScreen(activity) || statusView == null) return;
+        LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) statusView.getLayoutParams();
+        int leftMargin = visible
+            ? Math.round(activity.getResources().getDisplayMetrics().widthPixels * 0.24f) : 0;
+        if (params.leftMargin == leftMargin) return;
+        params.leftMargin = leftMargin;
+        statusView.setLayoutParams(params);
     }
 
     private static void renderMessages(Activity activity, JSONArray messages) {
