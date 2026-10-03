@@ -65,7 +65,8 @@ public final class NativeUi {
     private static TextView phoneStateView;
     private static EditText composerInput;
     private static Button sendButton;
-    private static Button stopButton;
+    private static boolean agentBusy;
+    private static boolean stopRequested;
     private static String screen = "";
     private static String currentSessionId = "";
     private static String currentSessionTitle = "定时任务";
@@ -236,7 +237,6 @@ public final class NativeUi {
                 phoneStateView = null;
                 composerInput = null;
                 sendButton = null;
-                stopButton = null;
                 Log.i(TAG, "screen=" + screen);
                 header(activity, state);
                 if (screen.equals("chat")) chat(activity, state);
@@ -634,6 +634,15 @@ public final class NativeUi {
         sendButton = button(activity, "发送", true);
         sendButton.setContentDescription("发送消息");
         sendButton.setOnClickListener(view -> {
+            if (screen.equals("chat") && agentBusy) {
+                if (!stopRequested) {
+                    stopRequested = true;
+                    sendButton.setText("停止中");
+                    sendButton.setEnabled(false);
+                    dispatch("stop", new JSONObject());
+                }
+                return;
+            }
             String prompt = composerInput.getText().toString().trim();
             if (prompt.isEmpty()) { status("请先输入消息", true); return; }
             JSONObject data = new JSONObject();
@@ -642,21 +651,6 @@ public final class NativeUi {
         });
         inputRow.addView(sendButton, margins(activity, dp(activity, 82), dp(activity, 50), 9, 0, 0, 0));
         outer.addView(inputRow, new LinearLayout.LayoutParams(-1, -2));
-
-        if (screen.equals("chat")) {
-            LinearLayout actions = row(activity);
-            Button browser = button(activity, "浏览器", false);
-            browser.setContentDescription("打开浏览器");
-            browser.setOnClickListener(view -> dispatch("browser", new JSONObject()));
-            actions.addView(browser, margins(activity, dp(activity, 88), dp(activity, 44), 0, 10, 0, 0));
-            stopButton = button(activity, "停止生成", false);
-            stopButton.setTextColor(RED);
-            touch(stopButton, shape(Color.rgb(255, 242, 238), dp(activity, 15),
-                                    Color.rgb(247, 213, 207)));
-            stopButton.setOnClickListener(view -> dispatch("stop", new JSONObject()));
-            actions.addView(stopButton, margins(activity, dp(activity, 96), dp(activity, 44), 8, 10, 0, 0));
-            outer.addView(actions);
-        }
         page.addView(outer, new LinearLayout.LayoutParams(-1, -2));
         if (screen.equals("chat")) {
             page.addOnLayoutChangeListener((view, left, top, right, bottom,
@@ -907,13 +901,13 @@ public final class NativeUi {
     }
 
     public static void busy(boolean value) {
+        agentBusy = value;
+        if (!value) stopRequested = false;
         if (sendButton != null && screen.equals("chat")) {
-            sendButton.setEnabled(!value);
-            sendButton.setAlpha(value ? 0.48f : 1.0f);
-        }
-        if (stopButton != null) {
-            stopButton.setEnabled(value);
-            stopButton.setVisibility(value ? View.VISIBLE : View.GONE);
+            sendButton.setText(value ? (stopRequested ? "停止中" : "停止") : "发送");
+            sendButton.setContentDescription(value ? "中断智能体任务" : "发送消息");
+            sendButton.setEnabled(!stopRequested);
+            sendButton.setAlpha(stopRequested ? 0.48f : 1.0f);
         }
     }
 

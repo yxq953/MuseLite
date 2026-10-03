@@ -460,21 +460,16 @@ class MuseLiteApp(toga.App):
                                        on_webview_load=self._on_transcript_load,
                                        style=Pack(height=1))
         content.add(self.transcript)
-        composer = toga.Box(style=Pack(direction="column", height=151,
+        composer = toga.Box(style=Pack(direction="column", height=111,
                                        background_color=WHITE))
         composer.add(toga.Box(style=Pack(height=1, background_color=LINE)))
         inner = toga.Box(style=Pack(direction="column", gap=6, margin=10))
-        tools = toga.Box(style=Pack(direction="row", gap=7, height=39))
-        if self.is_android:
-            tools.add(button("🌐 浏览器", self.show_browser, height=38))
-        self.stop_button = button("停止生成", self.stop_agent, height=38)
-        tools.add(self.stop_button)
-        inner.add(tools)
         compose_row = toga.Box(style=Pack(direction="row", gap=8, height=83))
         self.input = toga.MultilineTextInput(placeholder="输入消息，交给 MuseLite 处理…",
                                               style=Pack(flex=1, height=78))
         compose_row.add(self.input)
-        self.send_button = button("发送", self.send, width=78, height=78)
+        self.send_button = button("发送", lambda: self.stop_agent() if self.busy else self.send(),
+                                  width=78, height=78)
         compose_row.add(self.send_button)
         inner.add(compose_row)
         composer.add(inner)
@@ -590,8 +585,8 @@ class MuseLiteApp(toga.App):
             self.android.ui_busy(self.busy)
             return
         if self.current_view == "chat":
-            self.send_button.enabled = not self.busy
-            self.stop_button.enabled = self.busy
+            self.send_button.text = "停止" if self.busy else "发送"
+            self.send_button.enabled = True
 
     def _add_display(self, role: str, text: str, **extras):
         self.display_messages.append({"role": role, "content": text, **extras})
