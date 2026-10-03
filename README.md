@@ -2,16 +2,6 @@
 
 MuseLite is a Python-first AI workspace for Android. It combines an OpenAI-compatible chat client, persistent conversations, an execution sandbox, browser tools, scheduled prompts, and optional phone automation in one native Android application.
 
-## About
-
-MuseLite is built around three ideas:
-
-- **Muse** is the creative layer: it helps turn rough intent into useful questions, plans, and drafts.
-- **Dots** are the small signals of activity and state that keep a workspace easy to scan: sessions, scheduled work, tool progress, and status updates stay visible without getting in the way.
-- **Agent** is the action layer: it can call tools, work through multi-step tasks, use the local sandbox, browse pages, and operate an Android device when the user explicitly enables that capability.
-
-The project is designed for personal, inspectable workflows. Conversations and settings stay on the device unless a configured model provider receives a request. The Android application uses native Java UI and services where platform access matters, while Python owns the chat, Agent, storage, and tool orchestration layers.
-
 ## Features
 
 - Chat with any OpenAI-compatible HTTPS provider.
