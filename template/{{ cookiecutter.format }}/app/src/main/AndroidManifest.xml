@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -68,6 +69,9 @@
                 android:value="User initiated accessibility agent task" />
         </service>
         <receiver android:name="com.muselite.python.SessionAlarmReceiver" android:exported="false" />
+        <receiver android:name="com.muselite.python.TaskBootReceiver" android:exported="false">
+            <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>
+        </receiver>
         {{ cookiecutter.android_manifest_application_extra_content }}
     </application>
     {{ cookiecutter.android_manifest_extra_content }}

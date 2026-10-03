@@ -63,6 +63,15 @@ public class MainActivity extends AppCompatActivity {
     @Override public void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        String scheduledTask = intent.getStringExtra("task_id");
+        if (scheduledTask != null && !scheduledTask.isEmpty() && Python.isStarted()) {
+            try {
+                JSONObject data = new JSONObject().put("id", scheduledTask);
+                Python.getInstance().getModule("muselite_py.native_ui_callbacks")
+                    .callAttr("on_action", "scheduled_task_fire", data.toString());
+            } catch (Exception error) { Log.e(TAG, "Unable to handle scheduled task", error); }
+            intent.removeExtra("task_id");
+        }
         String scheduledSession = intent.getStringExtra("session_id");
         String scheduledPrompt = intent.getStringExtra("prompt");
         if (scheduledSession != null && !scheduledSession.isEmpty() && Python.isStarted()) {
@@ -161,6 +170,16 @@ public class MainActivity extends AppCompatActivity {
             new Kwarg("run_name", "__main__"),
             new Kwarg("alter_sys", true)
         );
+
+        String scheduledTask = getIntent().getStringExtra("task_id");
+        if (scheduledTask != null && !scheduledTask.isEmpty()) {
+            try {
+                JSONObject data = new JSONObject().put("id", scheduledTask);
+                py.getModule("muselite_py.native_ui_callbacks")
+                    .callAttr("on_action", "scheduled_task_fire", data.toString());
+            } catch (Exception error) { Log.e(TAG, "Unable to handle scheduled task", error); }
+            getIntent().removeExtra("task_id");
+        }
 
         String scheduledSession = getIntent().getStringExtra("session_id");
         String scheduledPrompt = getIntent().getStringExtra("prompt");

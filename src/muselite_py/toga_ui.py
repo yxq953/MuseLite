@@ -128,6 +128,8 @@ class MuseLiteApp(toga.App):
             self.browser = None
 
         self.current_session = None
+        self._pending_scheduled_tasks: list[str] = []
+        self._scheduled_session_ids: set[str] = set()
         self.current_view = "sessions"
         self.active_agent = None
         self.phone_active = False
@@ -164,6 +166,7 @@ class MuseLiteApp(toga.App):
                 {"id": item["id"], "title": item["title"] or "新对话",
                  "updated": datetime.fromtimestamp(item["updated_at"]).strftime("%m月%d日 %H:%M")}
                 for item in self.store.sessions()
+                if self.store.messages(item["id"])
             ],
         }
 
@@ -202,10 +205,92 @@ class MuseLiteApp(toga.App):
             "status": self.last_status, "status_error": self.status_error,
         }
 
+    def _native_tasks_state(self) -> dict:
+        return {
+            "view": "tasks", "title": "定时任务", "subtitle": "管理自动执行的任务",
+            "tasks": [
+                {**task, "time_label": datetime.fromtimestamp(task["when_ms"] / 1000)
+                 .strftime("%H:%M" if task["repeat_daily"] else "%Y-%m-%d %H:%M")}
+                for task in self.store.scheduled_tasks()
+            ],
+        }
+
+    def show_scheduled_tasks(self):
+        self.current_view = "tasks"
+        if self.is_android:
+            self.android.ui_show(self._native_tasks_state())
+
+    def show_add_scheduled_task(self):
+        self.current_view = "task_add"
+        if self.is_android:
+            self.android.ui_show({"view": "task_add", "title": "添加定时任务",
+                                  "subtitle": "设置执行时间和任务要求"})
+
+    def save_scheduled_task(self, data: dict) -> bool:
+        try:
+            task = self.store.create_scheduled_task(
+                str(data.get("name", "")), str(data.get("prompt", "")),
+                int(data["when_ms"]), bool(data.get("repeat_daily")))
+            try:
+                self.android.schedule_task(task)
+            except Exception:
+                self.store.delete_scheduled_task(task["id"])
+                raise
+        except Exception as exc:
+            self._set_status(str(exc), error=True)
+            return False
+        self.show_scheduled_tasks()
+        return True
+
+    def toggle_scheduled_task(self, task_id: str, enabled: bool) -> bool:
+        task = self.store.scheduled_task(task_id)
+        if task is None:
+            return False
+        try:
+            if enabled:
+                if not task["repeat_daily"] and task["when_ms"] <= int(time.time() * 1000):
+                    raise ValueError("一次性任务的时间已过，请重新添加")
+                self.android.schedule_task(task)
+            else:
+                self.android.cancel_task(task_id)
+            self.store.set_scheduled_task_enabled(task_id, enabled)
+        except Exception as exc:
+            self._set_status(str(exc), error=True)
+            return False
+        self.show_scheduled_tasks()
+        return True
+
+    def delete_scheduled_task(self, task_id: str) -> bool:
+        if self.store.scheduled_task(task_id) is None:
+            return False
+        self.android.cancel_task(task_id)
+        self.store.delete_scheduled_task(task_id)
+        self.show_scheduled_tasks()
+        return True
+
+    def trigger_scheduled_task(self, task_id: str) -> bool:
+        task = self.store.scheduled_task(task_id)
+        if task is None or not task["enabled"]:
+            return False
+        if self.busy:
+            if task_id not in self._pending_scheduled_tasks:
+                self._pending_scheduled_tasks.append(task_id)
+            return True
+        sid = self.store.create_session(task["name"])
+        self.open_session(sid)
+        if not self.send(prompt_override=task["prompt"]):
+            self.store.delete_session(sid)
+            return False
+        self._scheduled_session_ids.add(sid)
+        self.store.mark_scheduled_task_triggered(task_id)
+        return True
+
     def _cleanup_empty_sessions(self) -> None:
         """Remove draft sessions which were opened but never used."""
         for session in self.store.sessions():
             if self.store.messages(session["id"]):
+                continue
+            if session["id"] in self._scheduled_session_ids:
                 continue
             # A scheduled task is intentionally allowed to have no chat messages yet.
             if (session.get("title") or "").strip() == "定时任务":
@@ -266,7 +351,9 @@ class MuseLiteApp(toga.App):
                         color="#dcefeb", margin=(0, 14, 14, 14)))
         content.add(intro)
         new = toga.Box(style=Pack(direction="column", margin=(0, 14, 10, 14)))
-        new.add(button("开始新对话", self.new_session, height=50))
+        new.add(button("定时任务" if self.is_android else "开始新对话",
+                       self.show_scheduled_tasks if self.is_android else self.new_session,
+                       height=50))
         content.add(new)
         quick = toga.Box(style=Pack(direction="column", gap=6, margin=(0, 14, 12, 14),
                                     background_color=WHITE))
@@ -284,7 +371,7 @@ class MuseLiteApp(toga.App):
         quick_row.add(self.home_send_button)
         quick.add(quick_row)
         content.add(quick)
-        sessions = self.store.sessions()
+        sessions = [s for s in self.store.sessions() if self.store.messages(s["id"])]
         list_box = toga.Box(style=Pack(direction="column", gap=8, margin=(0, 14, 14, 14)))
         list_box.add(label("最近对话", size=12, color=MUTED, weight="bold",
                            margin=(5, 0, 3, 0)))
@@ -637,7 +724,7 @@ class MuseLiteApp(toga.App):
                 self.display_messages = self._stored_display(self.current_session)
                 users = [m for m in self.store.messages(self.current_session)
                          if m["role"] == "user"]
-                if len(users) == 1:
+                if len(users) == 1 and self.current_session not in self._scheduled_session_ids:
                     self.store.rename_session(self.current_session,
                                               str(users[0]["content"])[:32])
             if name == "error":
@@ -649,6 +736,9 @@ class MuseLiteApp(toga.App):
             else:
                 self._set_status("已完成")
             self._schedule_render()
+            if self._pending_scheduled_tasks:
+                task_id = self._pending_scheduled_tasks.pop(0)
+                self.loop.call_soon(self.trigger_scheduled_task, task_id)
             self._update_busy_controls()
 
     def stop_agent(self):

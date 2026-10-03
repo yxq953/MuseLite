@@ -9,12 +9,16 @@ public final class SessionAlarmReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
         if (intent == null || !SessionAlarmScheduler.ACTION.equals(intent.getAction())) return;
         String sessionId = intent.getStringExtra(SessionAlarmScheduler.EXTRA_SESSION_ID);
+        String taskId = intent.getStringExtra(SessionAlarmScheduler.EXTRA_TASK_ID);
         String prompt = intent.getStringExtra(SessionAlarmScheduler.EXTRA_PROMPT);
-        if (sessionId == null || sessionId.isEmpty()) return;
+        if ((sessionId == null || sessionId.isEmpty()) && (taskId == null || taskId.isEmpty())) return;
+        if (taskId != null && !taskId.isEmpty())
+            SessionAlarmScheduler.markTaskFired(context, taskId);
         Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         if (launch == null) return;
         launch.putExtra(SessionAlarmScheduler.EXTRA_SESSION_ID, sessionId);
         launch.putExtra(SessionAlarmScheduler.EXTRA_PROMPT, prompt == null ? "" : prompt);
+        if (taskId != null) launch.putExtra(SessionAlarmScheduler.EXTRA_TASK_ID, taskId);
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP |
                         Intent.FLAG_ACTIVITY_CLEAR_TOP);
         context.startActivity(launch);

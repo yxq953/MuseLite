@@ -35,6 +35,12 @@ class Store:
                 );
                 CREATE INDEX IF NOT EXISTS messages_session ON messages(session_id, id);
                 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS scheduled_tasks (
+                    id TEXT PRIMARY KEY, name TEXT NOT NULL, prompt TEXT NOT NULL,
+                    when_ms INTEGER NOT NULL, repeat_daily INTEGER NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1, created_at REAL NOT NULL,
+                    last_triggered_at REAL
+                );
             """)
 
     def close(self) -> None:
@@ -112,3 +118,46 @@ class Store:
                 "INSERT INTO settings(key, value) VALUES (?, ?) "
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value)
             )
+
+    def create_scheduled_task(self, name: str, prompt: str, when_ms: int,
+                              repeat_daily: bool) -> dict[str, Any]:
+        name, prompt = name.strip(), prompt.strip()
+        if not name or not prompt:
+            raise ValueError("请填写任务名称和任务要求")
+        if not repeat_daily and int(when_ms) <= int(time.time() * 1000):
+            raise ValueError("请选择未来的时间")
+        task_id = uuid.uuid4().hex
+        with self._lock, self._db:
+            self._db.execute(
+                "INSERT INTO scheduled_tasks VALUES (?, ?, ?, ?, ?, 1, ?, NULL)",
+                (task_id, name[:80], prompt, int(when_ms), int(repeat_daily), time.time()),
+            )
+        return self.scheduled_task(task_id)
+
+    def scheduled_task(self, task_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._db.execute("SELECT * FROM scheduled_tasks WHERE id=?", (task_id,)).fetchone()
+            return dict(row) if row else None
+
+    def scheduled_tasks(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [dict(row) for row in self._db.execute(
+                "SELECT * FROM scheduled_tasks ORDER BY created_at DESC"
+            )]
+
+    def set_scheduled_task_enabled(self, task_id: str, enabled: bool) -> None:
+        with self._lock, self._db:
+            self._db.execute("UPDATE scheduled_tasks SET enabled=? WHERE id=?",
+                             (int(enabled), task_id))
+
+    def mark_scheduled_task_triggered(self, task_id: str) -> None:
+        with self._lock, self._db:
+            self._db.execute(
+                "UPDATE scheduled_tasks SET last_triggered_at=?, "
+                "enabled=CASE WHEN repeat_daily=1 THEN enabled ELSE 0 END WHERE id=?",
+                (time.time(), task_id),
+            )
+
+    def delete_scheduled_task(self, task_id: str) -> None:
+        with self._lock, self._db:
+            self._db.execute("DELETE FROM scheduled_tasks WHERE id=?", (task_id,))

@@ -16,6 +16,14 @@ class AndroidBridge:
         self.secrets = jclass("com.muselite.python.SecretStore")
         self.phone = jclass("com.muselite.python.PhoneBridge")
         self.ui = jclass("com.muselite.python.NativeUi")
+        self.alarms = jclass("com.muselite.python.SessionAlarmScheduler")
+
+    def schedule_task(self, task: dict[str, Any]) -> None:
+        self.alarms.scheduleTask(self.activity, task["id"], task["when_ms"],
+                                 bool(task["repeat_daily"]))
+
+    def cancel_task(self, task_id: str) -> None:
+        self.alarms.cancelTask(self.activity, task_id)
 
     @property
     def files_dir(self) -> Path:

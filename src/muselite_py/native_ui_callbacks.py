@@ -32,6 +32,18 @@ def on_action(action: str, payload: str) -> bool:
     elif action == "scheduled_send":
         _app.open_session(data["id"])
         return bool(_app.send(prompt_override=data.get("text", "")))
+    elif action == "scheduled_task_fire":
+        return bool(_app.trigger_scheduled_task(data["id"]))
+    elif action == "tasks":
+        _app.show_scheduled_tasks()
+    elif action == "task_add":
+        _app.show_add_scheduled_task()
+    elif action == "task_save":
+        return bool(_app.save_scheduled_task(data))
+    elif action == "task_toggle":
+        return bool(_app.toggle_scheduled_task(data["id"], bool(data["enabled"])))
+    elif action == "task_delete":
+        return bool(_app.delete_scheduled_task(data["id"]))
     elif action == "stop":
         _app.stop_agent()
     elif action == "settings":

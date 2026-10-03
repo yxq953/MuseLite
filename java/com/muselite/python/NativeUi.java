@@ -198,7 +198,7 @@ public final class NativeUi {
                 (AppCompatActivity) activity, new OnBackPressedCallback(true) {
                     @Override public void handleOnBackPressed() {
                         if (screen.equals("sessions")) activity.finish();
-                        else dispatch("sessions", new JSONObject());
+                        else dispatch(screen.equals("task_add") ? "tasks" : "sessions", new JSONObject());
                     }
                 });
         }
@@ -241,6 +241,8 @@ public final class NativeUi {
                 header(activity, state);
                 if (screen.equals("chat")) chat(activity, state);
                 else if (screen.equals("settings")) settings(activity, state);
+                else if (screen.equals("tasks")) tasks(activity, state);
+                else if (screen.equals("task_add")) taskAdd(activity);
                 else sessions(activity, state);
             } catch (Exception error) {
                 Log.e(TAG, "screen failed", error);
@@ -262,8 +264,8 @@ public final class NativeUi {
         if (!screen.equals("sessions")) {
             Button back = headerButton(activity, "‹");
             back.setTextSize(27);
-            back.setContentDescription("返回会话列表");
-            back.setOnClickListener(view -> dispatch("sessions", new JSONObject()));
+            back.setContentDescription("返回上一页");
+            back.setOnClickListener(view -> dispatch(screen.equals("task_add") ? "tasks" : "sessions", new JSONObject()));
             bar.addView(back, new LinearLayout.LayoutParams(dp(activity, 48), dp(activity, 48)));
         } else {
             TextView mark = text(activity, "✦", 24, TEAL, true);
@@ -295,7 +297,7 @@ public final class NativeUi {
         titleParams.leftMargin = dp(activity, 13);
         titleParams.rightMargin = dp(activity, 8);
         bar.addView(titles, titleParams);
-        if (!screen.equals("settings")) {
+        if (screen.equals("chat") || screen.equals("sessions")) {
             Button settings = headerButton(activity, "设置");
             settings.setContentDescription("打开设置");
             settings.setOnClickListener(view -> dispatch("settings", new JSONObject()));
@@ -352,9 +354,9 @@ public final class NativeUi {
         hero.addView(heroContent, new FrameLayout.LayoutParams(-1, -2));
         body.addView(hero, margins(activity, -1, -2, 0, 0, 0, 0));
 
-        Button create = button(activity, "开始新对话", true);
-        create.setContentDescription("开始新对话");
-        create.setOnClickListener(view -> dispatch("new", new JSONObject()));
+        Button create = button(activity, "定时任务", true);
+        create.setContentDescription("定时任务");
+        create.setOnClickListener(view -> dispatch("tasks", new JSONObject()));
         create.setElevation(dp(activity, 3));
         body.addView(create, margins(activity, -1, dp(activity, 54), 0, 21, 0, 27));
         LinearLayout section = row(activity);
@@ -414,6 +416,136 @@ public final class NativeUi {
             }
         }
         composer(activity, "直接输入消息，开始新对话…", "start", state);
+    }
+
+    private static void tasks(Activity activity, JSONObject state) {
+        ScrollView scroll = new ScrollView(activity);
+        scroll.setFillViewport(true);
+        LinearLayout body = column(activity);
+        body.setPadding(dp(activity, 18), dp(activity, 22), dp(activity, 18), dp(activity, 28));
+        statusView = text(activity, "", 12, RED, false);
+        body.addView(statusView);
+        scroll.addView(body);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        JSONArray items = state.optJSONArray("tasks");
+        if (items == null || items.length() == 0) {
+            LinearLayout empty = column(activity);
+            empty.setPadding(dp(activity, 20), dp(activity, 22), dp(activity, 20), dp(activity, 22));
+            surface(empty, glass(activity, 18), 2);
+            empty.addView(text(activity, "还没有定时任务", 16, INK, true));
+            empty.addView(text(activity, "点击右下角加号创建一个自动执行的 Prompt。", 12, MUTED, false));
+            body.addView(empty);
+        } else {
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject task = items.optJSONObject(i);
+                if (task == null) continue;
+                String id = task.optString("id", "");
+                LinearLayout card = column(activity);
+                card.setPadding(dp(activity, 15), dp(activity, 13), dp(activity, 12), dp(activity, 13));
+                surface(card, glass(activity, 16), 2);
+                LinearLayout line = row(activity);
+                line.addView(text(activity, task.optString("name", "定时任务"), 16, INK, true),
+                             new LinearLayout.LayoutParams(0, -2, 1));
+                CheckBox enabled = new CheckBox(activity);
+                enabled.setChecked(task.optInt("enabled", 0) != 0);
+                enabled.setButtonTintList(ColorStateList.valueOf(TEAL));
+                enabled.setContentDescription("启用任务");
+                enabled.setOnCheckedChangeListener((button, checked) -> {
+                    JSONObject data = new JSONObject();
+                    try { data.put("id", id); data.put("enabled", checked); } catch (JSONException ignored) {}
+                    dispatch("task_toggle", data);
+                });
+                line.addView(enabled, new LinearLayout.LayoutParams(dp(activity, 50), dp(activity, 48)));
+                Button delete = button(activity, "删除", false);
+                delete.setTextColor(RED);
+                delete.setOnClickListener(view -> {
+                    JSONObject data = new JSONObject();
+                    try { data.put("id", id); } catch (JSONException ignored) {}
+                    dispatch("task_delete", data);
+                });
+                line.addView(delete, new LinearLayout.LayoutParams(dp(activity, 60), dp(activity, 46)));
+                card.addView(line);
+                String frequency = task.optInt("repeat_daily", 0) != 0 ? "每天重复" : "一次性";
+                card.addView(text(activity, frequency + " · " + task.optString("time_label", ""),
+                                  12, MUTED, false), margins(activity, -1, -2, 0, 4, 0, 0));
+                card.addView(text(activity, task.optString("prompt", ""), 13, INK, false),
+                             margins(activity, -1, -2, 0, 7, 0, 0));
+                body.addView(card, margins(activity, -1, -2, 0, 0, 0, 11));
+            }
+        }
+        Button add = button(activity, "+", true);
+        add.setTextSize(28);
+        add.setContentDescription("添加定时任务");
+        add.setOnClickListener(view -> dispatch("task_add", new JSONObject()));
+        FrameLayout.LayoutParams addParams = new FrameLayout.LayoutParams(dp(activity, 58), dp(activity, 58));
+        addParams.gravity = Gravity.BOTTOM | Gravity.RIGHT;
+        addParams.setMargins(0, 0, dp(activity, 20), dp(activity, 22));
+        host.addView(add, addParams);
+    }
+
+    private static void taskAdd(Activity activity) {
+        LinearLayout body = column(activity);
+        body.setPadding(dp(activity, 18), dp(activity, 22), dp(activity, 18), dp(activity, 26));
+        page.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        statusView = text(activity, "", 12, RED, false);
+        body.addView(statusView);
+        EditText name = new EditText(activity); name.setHint("任务名称"); name.setTextSize(15);
+        body.addView(name, margins(activity, -1, dp(activity, 58), 0, 0, 0, 12));
+        EditText prompt = new EditText(activity); prompt.setHint("任务要求 / Prompt"); prompt.setTextSize(15);
+        prompt.setGravity(Gravity.TOP); prompt.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        body.addView(prompt, margins(activity, -1, dp(activity, 130), 0, 0, 0, 16));
+        final boolean[] daily = {false};
+        final boolean[] timeSelected = {false};
+        final Calendar selected = Calendar.getInstance();
+        Button when = button(activity, "选择时间", false);
+        Button frequency = button(activity, "频率：一次性", false);
+        frequency.setOnClickListener(view -> {
+            daily[0] = !daily[0];
+            frequency.setText(daily[0] ? "频率：每天重复" : "频率：一次性");
+            if (timeSelected[0]) when.setText(daily[0]
+                ? String.format("每天 %02d:%02d", selected.get(Calendar.HOUR_OF_DAY), selected.get(Calendar.MINUTE))
+                : String.format("时间：%04d-%02d-%02d %02d:%02d",
+                    selected.get(Calendar.YEAR), selected.get(Calendar.MONTH) + 1,
+                    selected.get(Calendar.DAY_OF_MONTH), selected.get(Calendar.HOUR_OF_DAY),
+                    selected.get(Calendar.MINUTE)));
+        });
+        body.addView(frequency, margins(activity, -1, dp(activity, 50), 0, 0, 0, 10));
+        when.setOnClickListener(view -> {
+            if (daily[0]) {
+                showTaskTimePicker(activity, selected, when, timeSelected, true);
+            } else {
+                DatePickerDialog date = new DatePickerDialog(activity, (v, year, month, day) -> {
+                    selected.set(year, month, day);
+                    showTaskTimePicker(activity, selected, when, timeSelected, false);
+                }, selected.get(Calendar.YEAR), selected.get(Calendar.MONTH), selected.get(Calendar.DAY_OF_MONTH));
+                date.show();
+            }
+        });
+        body.addView(when, margins(activity, -1, dp(activity, 50), 0, 0, 0, 22));
+        Button save = button(activity, "保存任务", true);
+        save.setOnClickListener(view -> {
+            String taskName = name.getText().toString().trim(), taskPrompt = prompt.getText().toString().trim();
+            if (taskName.isEmpty() || taskPrompt.isEmpty()) { status("请填写任务名称和任务要求", true); return; }
+            if (!timeSelected[0]) { status("请选择执行时间", true); return; }
+            JSONObject data = new JSONObject();
+            try { data.put("name", taskName); data.put("prompt", taskPrompt); data.put("when_ms", selected.getTimeInMillis()); data.put("repeat_daily", daily[0]); }
+            catch (JSONException ignored) {}
+            dispatch("task_save", data);
+        });
+        body.addView(save, new LinearLayout.LayoutParams(-1, dp(activity, 52)));
+    }
+
+    private static void showTaskTimePicker(Activity activity, Calendar selected, Button when,
+                                           boolean[] timeSelected, boolean daily) {
+        new TimePickerDialog(activity, (view, hour, minute) -> {
+            selected.set(Calendar.HOUR_OF_DAY, hour); selected.set(Calendar.MINUTE, minute);
+            selected.set(Calendar.SECOND, 0); selected.set(Calendar.MILLISECOND, 0);
+            timeSelected[0] = true;
+            when.setText(daily ? String.format("每天 %02d:%02d", hour, minute)
+                : String.format("时间：%04d-%02d-%02d %02d:%02d",
+                    selected.get(Calendar.YEAR), selected.get(Calendar.MONTH) + 1,
+                    selected.get(Calendar.DAY_OF_MONTH), hour, minute));
+        }, selected.get(Calendar.HOUR_OF_DAY), selected.get(Calendar.MINUTE), true).show();
     }
 
     private static void chooseScheduleMode(Activity activity, String sessionId, String title,
@@ -517,22 +649,6 @@ public final class NativeUi {
             browser.setContentDescription("打开浏览器");
             browser.setOnClickListener(view -> dispatch("browser", new JSONObject()));
             actions.addView(browser, margins(activity, dp(activity, 88), dp(activity, 44), 0, 10, 0, 0));
-            Button schedule = button(activity, "定时", false);
-            schedule.setContentDescription("为当前会话设置定时 Prompt");
-            schedule.setOnClickListener(view -> {
-                String prompt = composerInput == null ? "" : composerInput.getText().toString().trim();
-                if (prompt.isEmpty()) {
-                    status("请先在输入框中填写要定时发送的指令", true);
-                    return;
-                }
-                String sessionId = currentSessionId;
-                if (sessionId.isEmpty()) {
-                    status("当前会话尚未准备好，请稍候再试", true);
-                    return;
-                }
-                chooseScheduleMode(activity, sessionId, currentSessionTitle, prompt);
-            });
-            actions.addView(schedule, margins(activity, dp(activity, 72), dp(activity, 44), 8, 10, 0, 0));
             stopButton = button(activity, "停止生成", false);
             stopButton.setTextColor(RED);
             touch(stopButton, shape(Color.rgb(255, 242, 238), dp(activity, 15),

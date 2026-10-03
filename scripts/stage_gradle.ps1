@@ -32,6 +32,9 @@ New-Item -ItemType Directory -Force $javaDestination,$assetDestination,$nativeDe
 if (Test-Path $oldJavaDestination) { Remove-Item -LiteralPath $oldJavaDestination -Recurse -Force }
 if (Test-Path $oldPythonDestination) { Remove-Item -LiteralPath $oldPythonDestination -Recurse -Force }
 Copy-Item (Join-Path $source 'java\com\muselite\python\*.java') $javaDestination -Force
+$activityTemplate = Get-Content (Join-Path $source 'template\{{ cookiecutter.format }}\app\src\main\java\org\beeware\android\MainActivity.java') -Raw
+$activityTemplate = $activityTemplate.Replace('{{ cookiecutter.package_name }}.{{ cookiecutter.module_name }}', 'com.muselite.python')
+[System.IO.File]::WriteAllText((Join-Path $main 'java\org\beeware\android\MainActivity.java'), $activityTemplate, (New-Object System.Text.UTF8Encoding $false))
 Copy-Item (Join-Path $source 'src\muselite_py\*.py') $pythonAppDestination -Force
 Copy-Item (Join-Path $source 'src\python\*.py') $pythonPackageDestination -Force
 Copy-Item (Join-Path $source 'res\xml\phone_accessibility.xml') $xmlDestination -Force
@@ -46,6 +49,7 @@ if (-not $manifestText.Contains('PhoneAccessibilityService')) {
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <queries><intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent></queries>
 '@
     $services = @'
@@ -57,10 +61,19 @@ if (-not $manifestText.Contains('PhoneAccessibilityService')) {
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User initiated accessibility agent task" />
         </service>
         <receiver android:name="com.muselite.python.SessionAlarmReceiver" android:exported="false" />
+        <receiver android:name="com.muselite.python.TaskBootReceiver" android:exported="false">
+            <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>
+        </receiver>
 '@
     $manifestText = $manifestText.Replace('<application', $permissions + "`n    <application")
     $manifestText = $manifestText.Replace('</application>', $services + "`n    </application>")
     Set-Content -Path $manifest -Value $manifestText -Encoding utf8
+}
+if (-not $manifestText.Contains('TaskBootReceiver')) {
+    $manifestText = $manifestText.Replace('<application', '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />' + "`n    <application")
+    $bootReceiver = '        <receiver android:name="com.muselite.python.TaskBootReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter></receiver>'
+    $manifestText = $manifestText.Replace('</application>', $bootReceiver + "`n    </application>")
+    [System.IO.File]::WriteAllText($manifest, $manifestText, (New-Object System.Text.UTF8Encoding $false))
 }
 $strings = Join-Path $main 'res\values\strings.xml'
 $stringsText = Get-Content $strings -Raw
