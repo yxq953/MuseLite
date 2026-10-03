@@ -44,6 +44,7 @@ public final class NativeBridge {
     private static final ArrayList<WebView> tabs = new ArrayList<>();
     private static final Map<String, CompletableFuture<String>> pending = new HashMap<>();
     private static FrameLayout overlay;
+    private static View dimLayer;
     private static LinearLayout browserPanel;
     private static LinearLayout browserToolbar;
     private static Button expandButton;
@@ -227,6 +228,11 @@ public final class NativeBridge {
             if (owner != activity || overlay == null) {
                 for (WebView tab : tabs) tab.destroy();
                 tabs.clear(); owner = activity; selected = 0;
+                dimLayer = new View(activity);
+                dimLayer.setBackgroundColor(Color.argb(105, 0, 0, 0));
+                dimLayer.setVisibility(View.GONE);
+                dimLayer.setClickable(true);
+                activity.addContentView(dimLayer, new ViewGroup.LayoutParams(-1, -1));
                 overlay = new FrameLayout(activity);
                 FrameLayout.LayoutParams params = miniParams(activity);
                 activity.addContentView(overlay, params);
@@ -240,7 +246,13 @@ public final class NativeBridge {
     private static void show(boolean visible) {
         if (visible && !NativeUi.isChatScreen(owner)) visible = false;
         browserVisible = visible;
-        if (visible) setBrowserLayout(owner, browserExpanded);
+        if (visible) {
+            setBrowserLayout(owner, browserExpanded);
+        } else {
+            browserExpanded = false;
+            if (dimLayer != null) dimLayer.setVisibility(View.GONE);
+            if (browserPanel != null) setBrowserLayout(owner, false);
+        }
         overlay.setTranslationX(visible ? 0 : overlay.getResources().getDisplayMetrics().widthPixels + 50);
     }
 
@@ -285,15 +297,19 @@ public final class NativeBridge {
     }
 
     private static FrameLayout.LayoutParams expandedParams(Activity activity) {
-        int height = Math.round(activity.getResources().getDisplayMetrics().heightPixels * 0.58f);
+        View parent = overlay == null ? null : (View) overlay.getParent();
+        int availableHeight = parent == null ? activity.getResources().getDisplayMetrics().heightPixels
+                                             : parent.getHeight();
+        int height = Math.round(availableHeight * 0.85f);
         FrameLayout.LayoutParams result = new FrameLayout.LayoutParams(-1, height);
-        result.gravity = android.view.Gravity.TOP;
+        result.gravity = android.view.Gravity.BOTTOM;
         return result;
     }
 
     private static void setBrowserLayout(Activity activity, boolean expanded) {
         if (activity == null || overlay == null || browserPanel == null) return;
         browserExpanded = expanded;
+        if (dimLayer != null) dimLayer.setVisibility(expanded ? View.VISIBLE : View.GONE);
         ViewGroup.LayoutParams current = overlay.getLayoutParams();
         ViewGroup.LayoutParams next = expanded ? expandedParams(activity) : miniParams(activity);
         current.width = next.width;
@@ -308,6 +324,13 @@ public final class NativeBridge {
             from.bottomMargin = to.bottomMargin;
         }
         overlay.setLayoutParams(current);
+        overlay.animate().cancel();
+        if (expanded) {
+            overlay.setTranslationY(dp(activity, 48));
+            overlay.animate().translationY(0f).setDuration(220).start();
+        } else {
+            overlay.setTranslationY(0f);
+        }
         FrameLayout.LayoutParams panelParams = (FrameLayout.LayoutParams) browserPanel.getLayoutParams();
         int inset = expanded ? 0 : dp(activity, 4);
         panelParams.setMargins(inset, inset, inset, inset);
