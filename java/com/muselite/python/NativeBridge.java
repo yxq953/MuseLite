@@ -308,8 +308,18 @@ public final class NativeBridge {
 
     private static void setBrowserLayout(Activity activity, boolean expanded) {
         if (activity == null || overlay == null || browserPanel == null) return;
+        boolean opening = expanded && !browserExpanded;
         browserExpanded = expanded;
-        if (dimLayer != null) dimLayer.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        if (dimLayer != null) {
+            dimLayer.animate().cancel();
+            dimLayer.setVisibility(expanded ? View.VISIBLE : View.GONE);
+            if (opening) {
+                dimLayer.setAlpha(0f);
+                dimLayer.animate().alpha(1f).setDuration(220).start();
+            } else if (expanded) {
+                dimLayer.setAlpha(1f);
+            }
+        }
         ViewGroup.LayoutParams current = overlay.getLayoutParams();
         ViewGroup.LayoutParams next = expanded ? expandedParams(activity) : miniParams(activity);
         current.width = next.width;
@@ -325,9 +335,9 @@ public final class NativeBridge {
         }
         overlay.setLayoutParams(current);
         overlay.animate().cancel();
-        if (expanded) {
-            overlay.setTranslationY(dp(activity, 48));
-            overlay.animate().translationY(0f).setDuration(220).start();
+        if (opening) {
+            overlay.setTranslationY(next.height);
+            overlay.animate().translationY(0f).setDuration(260).start();
         } else {
             overlay.setTranslationY(0f);
         }
