@@ -358,14 +358,8 @@ public final class NativeBridge {
             ViewGroup.LayoutParams toolbarParams = browserToolbar.getLayoutParams();
             toolbarParams.height = toolbarHeight;
             browserToolbar.setLayoutParams(toolbarParams);
-            for (int i = 0; i < browserToolbar.getChildCount(); i++) {
-                View child = browserToolbar.getChildAt(i);
-                ViewGroup.LayoutParams childParams = child.getLayoutParams();
-                childParams.height = toolbarHeight;
-                child.setLayoutParams(childParams);
-            }
         }
-        if (expandButton != null) expandButton.setText(expanded ? "收起" : "放大");
+        if (expandButton != null) expandButton.setText(expanded ? "收回" : "放大");
         if (browserContent != null && browserContent.getChildCount() > 0) {
             WebView web = (WebView) browserContent.getChildAt(0);
             FrameLayout.LayoutParams webParams = (FrameLayout.LayoutParams) web.getLayoutParams();
@@ -419,34 +413,21 @@ public final class NativeBridge {
         browserToolbar.setGravity(android.view.Gravity.CENTER_VERTICAL);
         int density = Math.round(owner.getResources().getDisplayMetrics().density);
         int barHeight = 56 * density;
-        browserToolbar.setPadding(12 * density, 0, 4 * density, 0);
+        browserToolbar.setPadding(8 * density, 0, 8 * density, 0);
         browserToolbar.setBackgroundColor(Color.WHITE);
-        TextView title = new TextView(owner);
-        title.setText("网页预览");
-        title.setTextColor(Color.rgb(42, 55, 78));
-        title.setTextSize(12);
-        title.setSingleLine(true);
-        browserToolbar.addView(title, new LinearLayout.LayoutParams(0, barHeight, 1f));
-        Button back = new Button(owner);
-        back.setText("‹");
-        back.setTextSize(18);
+        browserToolbar.addView(new View(owner), new LinearLayout.LayoutParams(0, 1, 1f));
+        Button back = browserButton(owner, "‹", "后退", 18);
         back.setOnClickListener(view -> { if (web.canGoBack()) web.goBack(); });
-        browserToolbar.addView(back, new LinearLayout.LayoutParams(38 * density, barHeight));
-        Button forward = new Button(owner);
-        forward.setText("›");
-        forward.setTextSize(18);
+        browserToolbar.addView(back, browserButtonParams(owner, 42));
+        Button forward = browserButton(owner, "›", "前进", 18);
         forward.setOnClickListener(view -> { if (web.canGoForward()) web.goForward(); });
-        browserToolbar.addView(forward, new LinearLayout.LayoutParams(38 * density, barHeight));
-        expandButton = new Button(owner);
-        expandButton.setText("放大");
-        expandButton.setTextSize(11);
+        browserToolbar.addView(forward, browserButtonParams(owner, 42));
+        expandButton = browserButton(owner, "收回", "收回网页卡片", 12);
         expandButton.setOnClickListener(view -> setBrowserLayout(owner, browserExpanded ? false : true));
-        browserToolbar.addView(expandButton, new LinearLayout.LayoutParams(56 * density, barHeight));
-        Button close = new Button(owner);
-        close.setText("×");
-        close.setTextSize(18);
+        browserToolbar.addView(expandButton, browserButtonParams(owner, 58));
+        Button close = browserButton(owner, "×", "关闭网页卡片", 18);
         close.setOnClickListener(view -> show(false));
-        browserToolbar.addView(close, new LinearLayout.LayoutParams(38 * density, barHeight));
+        browserToolbar.addView(close, browserButtonParams(owner, 42));
         browserPanel.addView(browserToolbar, new LinearLayout.LayoutParams(-1, barHeight));
 
         browserContent = new FrameLayout(owner);
@@ -459,6 +440,26 @@ public final class NativeBridge {
         previewTapTarget.setOnClickListener(view -> setBrowserLayout(owner, true));
         browserContent.addView(previewTapTarget, new FrameLayout.LayoutParams(-1, -1));
         setBrowserLayout(owner, browserExpanded);
+    }
+
+    private static Button browserButton(Activity activity, String label,
+                                        String description, int textSize) {
+        Button result = new Button(activity);
+        result.setText(label);
+        result.setTextSize(textSize);
+        result.setAllCaps(false);
+        result.setTextColor(Color.WHITE);
+        result.setContentDescription(description);
+        result.setPadding(0, 0, 0, 0);
+        result.setBackground(NativeUi.filledButtonBackground(activity));
+        return result;
+    }
+
+    private static LinearLayout.LayoutParams browserButtonParams(Activity activity, int widthDp) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            dp(activity, widthDp), dp(activity, 40));
+        params.leftMargin = dp(activity, 5);
+        return params;
     }
 
     private static WebView createTab(Activity activity) {

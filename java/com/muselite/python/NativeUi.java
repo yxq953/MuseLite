@@ -154,13 +154,18 @@ public final class NativeUi {
         result.setAllCaps(false);
         result.setTextColor(filled ? WHITE : TEAL);
         result.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        touch(result, filled
-            ? gradient(Color.rgb(129, 164, 222), Color.rgb(170, 151, 215), dp(context, 15), Color.TRANSPARENT)
-            : glass(context, 15));
+        if (filled) result.setBackground(filledButtonBackground(context));
+        else touch(result, glass(context, 15));
         result.setMinHeight(dp(context, 48));
         result.setMinWidth(dp(context, 48));
         result.setPadding(dp(context, 12), 0, dp(context, 12), 0);
         return result;
+    }
+
+    static Drawable filledButtonBackground(Context context) {
+        GradientDrawable fill = gradient(Color.rgb(129, 164, 222),
+            Color.rgb(170, 151, 215), dp(context, 15), Color.TRANSPARENT);
+        return new RippleDrawable(ColorStateList.valueOf(Color.argb(38, 90, 90, 90)), fill, null);
     }
 
     private static Button headerButton(Context context, String value) {
