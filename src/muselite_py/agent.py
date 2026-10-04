@@ -60,6 +60,18 @@ class Agent:
         messages = [{"role": "system", "content": prompt}]
         messages += self.store.messages(sid)
         partial: list[str] = []
+
+        def model_complete(current_messages, schemas, on_text):
+            try:
+                reply = self.client.complete(current_messages, schemas, on_text, self.cancel)
+            except InterruptedError:
+                raise
+            except Exception:
+                emit("model_unavailable", None)
+                raise
+            emit("model_ready", None)
+            return reply
+
         try:
             for step in range(self.max_steps):
                 if self.cancel.is_set():
@@ -77,7 +89,7 @@ class Agent:
                     partial.append(piece)
                     emit("text", piece)
 
-                reply = self.client.complete(messages, self.tools.schemas, on_text, self.cancel)
+                reply = model_complete(messages, self.tools.schemas, on_text)
                 calls = reply.pop("tool_calls")
                 if calls:
                     reply["tool_calls"] = calls
@@ -152,7 +164,7 @@ class Agent:
                 partial.append(piece)
                 emit("text", piece)
 
-            final = self.client.complete(messages, [], on_summary_text, self.cancel)
+            final = model_complete(messages, [], on_summary_text)
             if self.cancel.is_set():
                 raise InterruptedError("已停止生成")
             content = final.get("content") or "".join(partial)

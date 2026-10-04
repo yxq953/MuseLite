@@ -92,5 +92,8 @@ class AndroidBridge:
     def ui_busy(self, busy: bool) -> None:
         self.ui.busy(busy)
 
+    def ui_model_status(self, available: bool) -> None:
+        self.ui.modelStatus(self.activity, available)
+
     def ui_phone_status(self, state: dict[str, Any]) -> None:
         self.ui.phoneState(json.dumps(state, ensure_ascii=False))

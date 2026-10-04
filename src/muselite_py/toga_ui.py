@@ -145,6 +145,8 @@ class MuseLiteApp(toga.App):
         self.transcript_host = None
         self.last_status = ""
         self.status_error = False
+        # A successful provider response is required before showing green.
+        self.model_available = False
         self.root = toga.Box(style=Pack(direction="column", background_color=CANVAS))
         self.main_window = toga.MainWindow(title=self.formal_name)
         self.main_window.content = self.root
@@ -184,6 +186,7 @@ class MuseLiteApp(toga.App):
         return {
             "view": "chat", "title": ((session or {}).get("title") or "新对话")[:28],
             "subtitle": "模型 · " + self.store.get_setting("model", "deepseek-flash"),
+            "model_available": self.model_available,
             "session_id": self.current_session or "",
             "messages": messages, "busy": self.busy,
             "status": self.last_status, "status_error": self.status_error,
@@ -632,6 +635,7 @@ class MuseLiteApp(toga.App):
                 self.android.phone_stop_task()
                 self.phone_active = False
             self.active_agent = None
+            self.model_available = False
             self._add_display("error", str(exc))
             self._set_status(str(exc), error=True)
             return False
@@ -683,7 +687,11 @@ class MuseLiteApp(toga.App):
         return True
 
     def _event(self, name, value):
-        if name == "text":
+        if name in ("model_ready", "model_unavailable"):
+            self.model_available = name == "model_ready"
+            if self.is_android and self.current_view == "chat":
+                self.android.ui_model_status(self.model_available)
+        elif name == "text":
             if self._stream_index is None:
                 self._stream_index = len(self.display_messages)
                 self._add_display("assistant", "", pending=True)
@@ -890,6 +898,7 @@ class MuseLiteApp(toga.App):
             self.store.set_setting("base_url", base)
             self.store.set_setting("model", model)
             self.store.set_setting("vision", "1" if data.get("vision") else "0")
+            self.model_available = False
             self._set_status("设置已保存")
             return True
         except Exception as exc:

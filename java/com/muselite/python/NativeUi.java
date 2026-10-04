@@ -65,6 +65,7 @@ public final class NativeUi {
     private static LinearLayout messageList;
     private static ScrollView messageScroll;
     private static TextView titleView;
+    private static View modelStatusDot;
     private static TextView statusView;
     private static TextView phoneStateView;
     private static EditText composerInput;
@@ -281,6 +282,7 @@ public final class NativeUi {
                 host.addView(page, new FrameLayout.LayoutParams(-1, -1));
                 messageList = null;
                 messageScroll = null;
+                modelStatusDot = null;
                 statusView = null;
                 phoneStateView = null;
                 composerInput = null;
@@ -397,11 +399,16 @@ public final class NativeUi {
         titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
         center.addView(titleView, margins(activity, -1, -2, 0, 2, 0, 0));
         String subtext = state.optString("subtitle", "Python Agent");
+        LinearLayout subtitleRow = row(activity);
+        subtitleRow.setGravity(Gravity.CENTER);
+        modelStatusDot = new View(activity);
+        setModelStatus(state.optBoolean("model_available", false));
+        subtitleRow.addView(modelStatusDot, margins(activity, dp(activity, 7), dp(activity, 7), 0, 0, 5, 0));
         TextView subtitle = text(activity, subtext, 10, MUTED, false);
-        subtitle.setGravity(Gravity.CENTER);
         subtitle.setSingleLine(true);
         subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        center.addView(subtitle);
+        subtitleRow.addView(subtitle);
+        center.addView(subtitleRow);
 
         FrameLayout.LayoutParams centerParams = new FrameLayout.LayoutParams(
             dp(activity, 190), -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
@@ -996,6 +1003,7 @@ public final class NativeUi {
                 if (!updatedSessionId.isEmpty()) currentSessionId = updatedSessionId;
                 currentSessionTitle = state.optString("title", currentSessionTitle);
                 if (titleView != null) titleView.setText(state.optString("title", "新对话"));
+                setModelStatus(state.optBoolean("model_available", false));
                 renderMessages(activity, state.optJSONArray("messages"));
                 busy(state.optBoolean("busy", false));
                 status(state.optString("status", ""), state.optBoolean("status_error", false));
@@ -1022,6 +1030,19 @@ public final class NativeUi {
                                         : Color.rgb(235, 241, 253),
                                        dp(statusView.getContext(), 11), Color.TRANSPARENT));
         statusView.setVisibility(value == null || value.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    private static void setModelStatus(boolean available) {
+        if (modelStatusDot == null) return;
+        modelStatusDot.setBackground(orb(available ? Color.rgb(54, 178, 104)
+                                                   : Color.rgb(160, 169, 184), 255));
+        modelStatusDot.setContentDescription(available ? "模型可用" : "模型不可用或尚未验证");
+    }
+
+    public static void modelStatus(Activity activity, boolean available) {
+        onMain(activity, () -> {
+            if (owner == activity && screen.equals("chat")) setModelStatus(available);
+        });
     }
 
     public static void phoneState(String json) {
