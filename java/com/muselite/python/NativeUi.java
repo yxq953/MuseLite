@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.res.ColorStateList;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.RenderEffect;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -168,12 +170,50 @@ public final class NativeUi {
         return new RippleDrawable(ColorStateList.valueOf(Color.argb(38, 90, 90, 90)), fill, null);
     }
 
-    private static Button headerButton(Context context, String value) {
-        Button result = button(context, value, false);
-        result.setTextColor(INK);
+    private static HeaderIconView headerIcon(Context context, boolean back) {
+        HeaderIconView result = new HeaderIconView(context, back);
         result.setBackgroundColor(Color.TRANSPARENT);
-        result.setStateListAnimator(null);
+        result.setClickable(true);
+        result.setFocusable(true);
         return result;
+    }
+
+    private static final class HeaderIconView extends View {
+        private final boolean back;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        HeaderIconView(Context context, boolean back) {
+            super(context);
+            this.back = back;
+            paint.setColor(INK);
+            paint.setStrokeCap(Paint.Cap.SQUARE);
+            paint.setStyle(Paint.Style.STROKE);
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float density = getResources().getDisplayMetrics().density;
+            float centerX = getWidth() * 0.5f;
+            float centerY = getHeight() * 0.5f;
+            paint.setStrokeWidth(Math.max(2f, 2.4f * density));
+            if (back) {
+                float left = getWidth() * 0.27f;
+                float right = getWidth() * 0.76f;
+                float tip = getWidth() * 0.24f;
+                float wing = getHeight() * 0.24f;
+                canvas.drawLine(left, centerY, right, centerY, paint);
+                canvas.drawLine(tip, centerY, left + wing, centerY - wing, paint);
+                canvas.drawLine(tip, centerY, left + wing, centerY + wing, paint);
+            } else {
+                paint.setStyle(Paint.Style.FILL);
+                float radius = Math.max(2.5f, 2.7f * density);
+                float top = getHeight() * 0.27f;
+                float gap = getHeight() * 0.23f;
+                canvas.drawCircle(centerX, top, radius, paint);
+                canvas.drawCircle(centerX, top + gap, radius, paint);
+                canvas.drawCircle(centerX, top + gap * 2f, radius, paint);
+            }
+        }
     }
 
     private static LinearLayout.LayoutParams margins(Context context, int width, int height,
@@ -266,9 +306,9 @@ public final class NativeUi {
         LinearLayout bar = row(activity);
         bar.setPadding(dp(activity, 18), dp(activity, 13), dp(activity, 18), dp(activity, 13));
         bar.setBackgroundColor(CANVAS);
+        bar.setElevation(dp(activity, 3));
         if (!screen.equals("sessions")) {
-            Button back = headerButton(activity, "←");
-            back.setTextSize(28);
+            HeaderIconView back = headerIcon(activity, true);
             back.setContentDescription("返回上一页");
             back.setOnClickListener(view -> dispatch(screen.equals("task_add") ? "tasks" : "sessions", new JSONObject()));
             bar.addView(back, new LinearLayout.LayoutParams(dp(activity, 48), dp(activity, 48)));
@@ -303,23 +343,12 @@ public final class NativeUi {
         titleParams.rightMargin = dp(activity, 8);
         bar.addView(titles, titleParams);
         if (screen.equals("chat") || screen.equals("sessions")) {
-            Button settings = headerButton(activity, "设置");
+            HeaderIconView settings = headerIcon(activity, false);
             settings.setContentDescription("打开设置");
             settings.setOnClickListener(view -> dispatch("settings", new JSONObject()));
-            bar.addView(settings, new LinearLayout.LayoutParams(dp(activity, 66), dp(activity, 48)));
+            bar.addView(settings, new LinearLayout.LayoutParams(dp(activity, 48), dp(activity, 48)));
         }
         page.addView(bar, new LinearLayout.LayoutParams(-1, -2));
-        View separator = new View(activity);
-        GradientDrawable softDivider = new GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            new int[]{Color.TRANSPARENT, Color.argb(42, 95, 105, 120), Color.TRANSPARENT});
-        softDivider.setCornerRadius(dp(activity, 8));
-        separator.setBackground(softDivider);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            separator.setRenderEffect(RenderEffect.createBlurEffect(
-                dp(activity, 3), dp(activity, 3), Shader.TileMode.CLAMP));
-        }
-        page.addView(separator, new LinearLayout.LayoutParams(-1, dp(activity, 8)));
     }
 
     private static void sessions(Activity activity, JSONObject state) {
