@@ -171,7 +171,8 @@ public final class NativeUi {
     private static Button headerButton(Context context, String value) {
         Button result = button(context, value, false);
         result.setTextColor(INK);
-        touch(result, shape(CANVAS, dp(context, 15), CANVAS));
+        result.setBackgroundColor(Color.TRANSPARENT);
+        result.setStateListAnimator(null);
         return result;
     }
 
@@ -266,8 +267,8 @@ public final class NativeUi {
         bar.setPadding(dp(activity, 18), dp(activity, 13), dp(activity, 18), dp(activity, 13));
         bar.setBackgroundColor(CANVAS);
         if (!screen.equals("sessions")) {
-            Button back = headerButton(activity, "‹");
-            back.setTextSize(27);
+            Button back = headerButton(activity, "←");
+            back.setTextSize(28);
             back.setContentDescription("返回上一页");
             back.setOnClickListener(view -> dispatch(screen.equals("task_add") ? "tasks" : "sessions", new JSONObject()));
             bar.addView(back, new LinearLayout.LayoutParams(dp(activity, 48), dp(activity, 48)));
@@ -309,8 +310,16 @@ public final class NativeUi {
         }
         page.addView(bar, new LinearLayout.LayoutParams(-1, -2));
         View separator = new View(activity);
-        separator.setBackgroundColor(LINE);
-        page.addView(separator, new LinearLayout.LayoutParams(-1, dp(activity, 1)));
+        GradientDrawable softDivider = new GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            new int[]{Color.TRANSPARENT, Color.argb(42, 95, 105, 120), Color.TRANSPARENT});
+        softDivider.setCornerRadius(dp(activity, 8));
+        separator.setBackground(softDivider);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            separator.setRenderEffect(RenderEffect.createBlurEffect(
+                dp(activity, 3), dp(activity, 3), Shader.TileMode.CLAMP));
+        }
+        page.addView(separator, new LinearLayout.LayoutParams(-1, dp(activity, 8)));
     }
 
     private static void sessions(Activity activity, JSONObject state) {
