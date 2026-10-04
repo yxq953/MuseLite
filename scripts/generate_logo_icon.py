@@ -6,7 +6,7 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "assets" / "logo.jpg"
+SOURCE = ROOT / "assets" / "logo01.png"
 RESOURCE_ROOTS = (
     ROOT / "template" / "{{ cookiecutter.format }}" / "app" / "src" / "main" / "res",
     ROOT / "build" / "python" / "android" / "gradle" / "app" / "src" / "main" / "res",

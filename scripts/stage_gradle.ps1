@@ -40,6 +40,15 @@ Copy-Item (Join-Path $source 'src\python\*.py') $pythonPackageDestination -Force
 Copy-Item (Join-Path $source 'res\xml\phone_accessibility.xml') $xmlDestination -Force
 Copy-Item (Join-Path $source 'vendor\assets\alpine-minirootfs.tar') $assetDestination -Force
 Copy-Item (Join-Path $source 'vendor\native_libs\arm64-v8a\*.so') $nativeDestination -Force
+$iconSource = Join-Path $source 'template\{{ cookiecutter.format }}\app\src\main\res'
+$iconDestination = Join-Path $main 'res'
+foreach ($density in @('mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi')) {
+    $folder = 'mipmap-' + $density
+    foreach ($name in @('ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png', 'splash.png')) {
+        Copy-Item (Join-Path $iconSource "$folder\$name") (Join-Path $iconDestination "$folder\$name") -Force
+    }
+}
+Copy-Item (Join-Path $iconSource 'drawable\logo_foreground.png') (Join-Path $iconDestination 'drawable\logo_foreground.png') -Force
 $appGradle = Join-Path $ProjectRoot 'app\build.gradle'
 $manifest = Join-Path $main 'AndroidManifest.xml'
 $manifestText = Get-Content $manifest -Raw
