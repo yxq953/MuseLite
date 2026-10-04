@@ -360,7 +360,7 @@ public final class NativeUi {
 
     /** The chat header has its own centered identity mark; the sessions header stays unchanged. */
     private static void chatHeader(Activity activity, JSONObject state) {
-        int height = dp(activity, 100);
+        int height = dp(activity, 103);
         FrameLayout bar = new FrameLayout(activity);
         bar.setPadding(dp(activity, 18), dp(activity, 8), dp(activity, 18), dp(activity, 8));
         bar.setBackgroundColor(WHITE);
