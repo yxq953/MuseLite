@@ -193,22 +193,22 @@ public final class NativeUi {
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             float density = getResources().getDisplayMetrics().density;
-            float centerX = getWidth() * 0.5f;
+            float centerX = back ? getWidth() * 0.5f : getWidth() * 0.58f;
             float centerY = getHeight() * 0.5f;
             paint.setStrokeWidth(Math.max(1.5f, 1.8f * density));
             if (back) {
-                float left = getWidth() * 0.34f;
-                float right = getWidth() * 0.68f;
-                float tip = getWidth() * 0.31f;
-                float wing = getHeight() * 0.17f;
+                float left = getWidth() * 0.30f;
+                float right = getWidth() * 0.61f;
+                float tip = getWidth() * 0.27f;
+                float wing = getHeight() * 0.14f;
                 canvas.drawLine(left, centerY, right, centerY, paint);
                 canvas.drawLine(tip, centerY, left + wing, centerY - wing, paint);
                 canvas.drawLine(tip, centerY, left + wing, centerY + wing, paint);
             } else {
                 paint.setStyle(Paint.Style.FILL);
-                float radius = Math.max(2f, 2.1f * density);
-                float top = getHeight() * 0.32f;
-                float gap = getHeight() * 0.18f;
+                float radius = Math.max(1.6f, 1.7f * density);
+                float top = getHeight() * 0.35f;
+                float gap = getHeight() * 0.16f;
                 canvas.drawCircle(centerX, top, radius, paint);
                 canvas.drawCircle(centerX, top + gap, radius, paint);
                 canvas.drawCircle(centerX, top + gap * 2f, radius, paint);
