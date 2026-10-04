@@ -171,8 +171,7 @@ public final class NativeUi {
     private static Button headerButton(Context context, String value) {
         Button result = button(context, value, false);
         result.setTextColor(INK);
-        touch(result, shape(Color.argb(29, 255, 255, 255), dp(context, 15),
-                            Color.rgb(224, 229, 241)));
+        touch(result, shape(CANVAS, dp(context, 15), CANVAS));
         return result;
     }
 
@@ -265,7 +264,7 @@ public final class NativeUi {
     private static void header(Activity activity, JSONObject state) {
         LinearLayout bar = row(activity);
         bar.setPadding(dp(activity, 18), dp(activity, 13), dp(activity, 18), dp(activity, 13));
-        bar.setBackgroundColor(WHITE);
+        bar.setBackgroundColor(CANVAS);
         if (!screen.equals("sessions")) {
             Button back = headerButton(activity, "‹");
             back.setTextSize(27);

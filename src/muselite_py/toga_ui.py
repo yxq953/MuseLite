@@ -305,7 +305,7 @@ class MuseLiteApp(toga.App):
 
     def _screen(self, title: str, subtitle: str = ""):
         self.root.clear()
-        heading = toga.Box(style=Pack(direction="column", background_color=WHITE))
+        heading = toga.Box(style=Pack(direction="column", background_color=CANVAS))
         top = toga.Box(style=Pack(direction="row", gap=7, margin=10, height=47))
         top.add(button("会话", self.show_sessions, width=58, height=42))
         titles = toga.Box(style=Pack(direction="column", flex=1, gap=2, margin_top=2))
