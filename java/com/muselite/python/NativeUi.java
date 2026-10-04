@@ -195,20 +195,20 @@ public final class NativeUi {
             float density = getResources().getDisplayMetrics().density;
             float centerX = getWidth() * 0.5f;
             float centerY = getHeight() * 0.5f;
-            paint.setStrokeWidth(Math.max(2f, 2.4f * density));
+            paint.setStrokeWidth(Math.max(1.5f, 1.8f * density));
             if (back) {
-                float left = getWidth() * 0.27f;
-                float right = getWidth() * 0.76f;
-                float tip = getWidth() * 0.24f;
-                float wing = getHeight() * 0.24f;
+                float left = getWidth() * 0.34f;
+                float right = getWidth() * 0.68f;
+                float tip = getWidth() * 0.31f;
+                float wing = getHeight() * 0.17f;
                 canvas.drawLine(left, centerY, right, centerY, paint);
                 canvas.drawLine(tip, centerY, left + wing, centerY - wing, paint);
                 canvas.drawLine(tip, centerY, left + wing, centerY + wing, paint);
             } else {
                 paint.setStyle(Paint.Style.FILL);
-                float radius = Math.max(2.5f, 2.7f * density);
-                float top = getHeight() * 0.27f;
-                float gap = getHeight() * 0.23f;
+                float radius = Math.max(2f, 2.1f * density);
+                float top = getHeight() * 0.32f;
+                float gap = getHeight() * 0.18f;
                 canvas.drawCircle(centerX, top, radius, paint);
                 canvas.drawCircle(centerX, top + gap, radius, paint);
                 canvas.drawCircle(centerX, top + gap * 2f, radius, paint);
@@ -322,7 +322,7 @@ public final class NativeUi {
         }
         LinearLayout titles = column(activity);
         String title = state.optString("title", "MuseLite");
-        titleView = text(activity, title, 20, INK, true);
+        titleView = text(activity, title, 17, INK, true);
         titleView.setSingleLine(true);
         titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
         titles.addView(titleView);
@@ -334,7 +334,7 @@ public final class NativeUi {
                 subtext += " · v" + version;
             } catch (Exception ignored) {}
         }
-        TextView subtitle = text(activity, subtext, 11, MUTED, false);
+        TextView subtitle = text(activity, subtext, 10, MUTED, false);
         subtitle.setSingleLine(true);
         subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         titles.addView(subtitle);
