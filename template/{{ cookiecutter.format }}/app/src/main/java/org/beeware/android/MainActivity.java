@@ -96,7 +96,7 @@ public class MainActivity extends AppCompatActivity {
         singletonThis = this;
 
         EdgeToEdge.enable(this, SystemBarStyle.dark(getColor(R.color.colorPrimaryDark)));
-        getWindow().setStatusBarColor(Color.WHITE);
+        getWindow().setStatusBarColor(Color.rgb(248, 250, 255));
         getWindow().setNavigationBarColor(Color.WHITE);
         getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
@@ -207,7 +207,7 @@ public class MainActivity extends AppCompatActivity {
         // targeting API level 35 and higher, so we need to manually draw the status bar
         // background (https://stackoverflow.com/q/78832208).
         View statusBarBackground = new View(this);
-        statusBarBackground.setBackgroundColor(Color.WHITE);
+        statusBarBackground.setBackgroundColor(Color.rgb(248, 250, 255));
         addContentView(
             statusBarBackground,
             new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0)
