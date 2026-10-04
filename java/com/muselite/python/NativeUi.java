@@ -42,6 +42,7 @@ import com.chaquo.python.Python;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.beeware.android.MainActivity;
 
 /** Android UI for the Python app. The transcript and composer have separate layout slots. */
 public final class NativeUi {
@@ -269,6 +270,7 @@ public final class NativeUi {
                 ensure(activity);
                 JSONObject state = new JSONObject(stateJson);
                 screen = state.optString("view", "sessions");
+                MainActivity.setMuseLiteStatusBar(screen.equals("chat"));
                 NativeBridge.onScreenChanged(screen.equals("chat"));
                 currentSessionId = state.optString("session_id", "");
                 currentSessionTitle = state.optString("title", "定时任务");
