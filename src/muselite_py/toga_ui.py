@@ -303,9 +303,9 @@ class MuseLiteApp(toga.App):
                 self.current_session = None
                 self.display_messages = []
 
-    def _screen(self, title: str, subtitle: str = ""):
+    def _screen(self, title: str, subtitle: str = "", background: str = CANVAS):
         self.root.clear()
-        heading = toga.Box(style=Pack(direction="column", background_color=CANVAS))
+        heading = toga.Box(style=Pack(direction="column", background_color=background))
         top = toga.Box(style=Pack(direction="row", gap=7, margin=10, height=47))
         top.add(button("会话", self.show_sessions, width=58, height=42))
         titles = toga.Box(style=Pack(direction="column", flex=1, gap=2, margin_top=2))
@@ -315,10 +315,10 @@ class MuseLiteApp(toga.App):
         top.add(titles)
         top.add(button("设置", self.show_settings, width=58, height=42))
         heading.add(top)
-        heading.add(toga.Box(style=Pack(height=1, background_color=LINE)))
+        heading.add(toga.Box(style=Pack(height=1, background_color=background)))
         self.root.add(heading)
         body = toga.Box(style=Pack(direction="column", flex=1,
-                                   background_color=CANVAS))
+                                   background_color=background))
         self.root.add(body)
         self.status_label = label(self.last_status, size=11,
                                   color=ERROR if self.last_status else MUTED, margin=6)
@@ -447,7 +447,7 @@ class MuseLiteApp(toga.App):
         session = next((s for s in self.store.sessions() if s["id"] == sid), None)
         title = (session or {}).get("title", "新对话")
         model = self.store.get_setting("model", "deepseek-flash")
-        content = self._screen(title[:28], "模型 · " + model)
+        content = self._screen(title[:28], "模型 · " + model, background=WHITE)
         self.transcript_host = content
         self.native_transcript_box = toga.Box(style=Pack(direction="column", gap=10,
                                                          margin=14))

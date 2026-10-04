@@ -274,7 +274,7 @@ public final class NativeUi {
                 currentSessionTitle = state.optString("title", "定时任务");
                 host.removeAllViews();
                 page = column(activity);
-                page.setBackgroundColor(Color.TRANSPARENT);
+                page.setBackgroundColor(screen.equals("chat") ? WHITE : Color.TRANSPARENT);
                 host.addView(page, new FrameLayout.LayoutParams(-1, -1));
                 messageList = null;
                 messageScroll = null;
@@ -305,7 +305,7 @@ public final class NativeUi {
     private static void header(Activity activity, JSONObject state) {
         LinearLayout bar = row(activity);
         bar.setPadding(dp(activity, 18), dp(activity, 13), dp(activity, 18), dp(activity, 13));
-        bar.setBackgroundColor(CANVAS);
+        bar.setBackgroundColor(screen.equals("chat") ? WHITE : CANVAS);
         bar.setElevation(dp(activity, 3));
         if (!screen.equals("sessions")) {
             HeaderIconView back = headerIcon(activity, true);
@@ -629,9 +629,11 @@ public final class NativeUi {
 
     private static void chat(Activity activity, JSONObject state) {
         messageScroll = new ScrollView(activity);
+        messageScroll.setBackgroundColor(WHITE);
         messageScroll.setFillViewport(true);
         messageScroll.setVerticalScrollBarEnabled(false);
         messageList = column(activity);
+        messageList.setBackgroundColor(WHITE);
         messageList.setPadding(dp(activity, 18), dp(activity, 22), dp(activity, 18), dp(activity, 22));
         messageScroll.addView(messageList);
         page.addView(messageScroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -643,7 +645,7 @@ public final class NativeUi {
     private static void composer(Activity activity, String hint, String action, JSONObject state) {
         LinearLayout outer = column(activity);
         outer.setPadding(dp(activity, 16), dp(activity, 12), dp(activity, 16), dp(activity, 12));
-        GradientDrawable composerGlass = gradient(Color.WHITE, Color.rgb(247, 248, 255), 0, Color.rgb(218, 232, 255));
+        GradientDrawable composerGlass = gradient(Color.WHITE, Color.WHITE, 0, Color.rgb(218, 232, 255));
         float curve = dp(activity, 23);
         composerGlass.setCornerRadii(new float[]{curve, curve, curve, curve, 0, 0, 0, 0});
         surface(outer, composerGlass, 12);
