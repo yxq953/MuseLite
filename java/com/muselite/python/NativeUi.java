@@ -134,6 +134,11 @@ public final class NativeUi {
         return result;
     }
 
+    private static boolean whiteScreen() {
+        return screen.equals("sessions") || screen.equals("settings") ||
+               screen.equals("tasks") || screen.equals("task_add") || screen.equals("chat");
+    }
+
     private static TextView text(Context context, String value, int size, int color, boolean bold) {
         TextView result = new TextView(context);
         result.setText(value);
@@ -278,9 +283,8 @@ public final class NativeUi {
                 currentSessionTitle = state.optString("title", "定时任务");
                 host.removeAllViews();
                 page = column(activity);
-                host.setBackgroundColor(screen.equals("sessions") ? WHITE : CANVAS);
-                page.setBackgroundColor(screen.equals("chat") || screen.equals("sessions")
-                    ? WHITE : Color.TRANSPARENT);
+                host.setBackgroundColor(whiteScreen() ? WHITE : CANVAS);
+                page.setBackgroundColor(whiteScreen() ? WHITE : Color.TRANSPARENT);
                 host.addView(page, new FrameLayout.LayoutParams(-1, -1));
                 messageList = null;
                 messageScroll = null;
@@ -316,7 +320,7 @@ public final class NativeUi {
         }
         LinearLayout bar = row(activity);
         bar.setPadding(dp(activity, 18), dp(activity, 13), dp(activity, 18), dp(activity, 13));
-        bar.setBackgroundColor(screen.equals("chat") || screen.equals("sessions") ? WHITE : CANVAS);
+        bar.setBackgroundColor(whiteScreen() ? WHITE : CANVAS);
         bar.setElevation(dp(activity, 3));
         if (!screen.equals("sessions")) {
             HeaderIconView back = headerIcon(activity, true);
@@ -600,9 +604,13 @@ public final class NativeUi {
         statusView = text(activity, "", 12, RED, false);
         body.addView(statusView);
         EditText name = new EditText(activity); name.setHint("任务名称"); name.setTextSize(15);
+        name.setBackground(shape(WHITE, dp(activity, 12), LINE));
+        name.setPadding(dp(activity, 14), 0, dp(activity, 14), 0);
         body.addView(name, margins(activity, -1, dp(activity, 58), 0, 0, 0, 12));
         EditText prompt = new EditText(activity); prompt.setHint("任务要求 / Prompt"); prompt.setTextSize(15);
         prompt.setGravity(Gravity.TOP); prompt.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        prompt.setBackground(shape(WHITE, dp(activity, 12), LINE));
+        prompt.setPadding(dp(activity, 14), dp(activity, 12), dp(activity, 14), dp(activity, 12));
         body.addView(prompt, margins(activity, -1, dp(activity, 130), 0, 0, 0, 16));
         final boolean[] daily = {false};
         final boolean[] timeSelected = {false};
@@ -886,7 +894,7 @@ public final class NativeUi {
         if (secret) input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         input.setSingleLine(true);
         input.setPadding(dp(activity, 15), 0, dp(activity, 15), 0);
-        input.setBackground(shape(Color.rgb(247, 248, 255), dp(activity, 14), LINE));
+        input.setBackground(shape(WHITE, dp(activity, 14), LINE));
         body.addView(input, new LinearLayout.LayoutParams(-1, dp(activity, 52)));
         return input;
     }
@@ -944,8 +952,7 @@ public final class NativeUi {
             11, MUTED, false);
         example.setPadding(dp(activity, 12), dp(activity, 9),
                            dp(activity, 12), dp(activity, 9));
-        example.setBackground(shape(Color.rgb(239, 243, 253), dp(activity, 12),
-                                    Color.TRANSPARENT));
+        example.setBackground(shape(WHITE, dp(activity, 12), LINE));
         modelCard.addView(example, margins(activity, -1, -2, 0, 14, 0, 0));
         body.addView(modelCard, new LinearLayout.LayoutParams(-1, -2));
 
