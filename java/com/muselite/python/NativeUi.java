@@ -26,6 +26,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.app.DatePickerDialog;
@@ -305,6 +306,10 @@ public final class NativeUi {
     }
 
     private static void header(Activity activity, JSONObject state) {
+        if (screen.equals("chat")) {
+            chatHeader(activity, state);
+            return;
+        }
         LinearLayout bar = row(activity);
         bar.setPadding(dp(activity, 18), dp(activity, 13), dp(activity, 18), dp(activity, 13));
         bar.setBackgroundColor(screen.equals("chat") ? WHITE : CANVAS);
@@ -351,6 +356,58 @@ public final class NativeUi {
             bar.addView(settings, new LinearLayout.LayoutParams(dp(activity, 48), dp(activity, 48)));
         }
         page.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    /** The chat header has its own centered identity mark; the sessions header stays unchanged. */
+    private static void chatHeader(Activity activity, JSONObject state) {
+        int height = dp(activity, 126);
+        FrameLayout bar = new FrameLayout(activity);
+        bar.setPadding(dp(activity, 18), dp(activity, 8), dp(activity, 18), dp(activity, 8));
+        bar.setBackgroundColor(WHITE);
+        bar.setElevation(dp(activity, 3));
+
+        HeaderIconView back = headerIcon(activity, true);
+        back.setContentDescription("返回上一页");
+        back.setOnClickListener(view -> dispatch("sessions", new JSONObject()));
+        FrameLayout.LayoutParams backParams = new FrameLayout.LayoutParams(
+            dp(activity, 48), dp(activity, 48), Gravity.START | Gravity.CENTER_VERTICAL);
+        bar.addView(back, backParams);
+
+        HeaderIconView settings = headerIcon(activity, false);
+        settings.setContentDescription("打开设置");
+        settings.setOnClickListener(view -> dispatch("settings", new JSONObject()));
+        FrameLayout.LayoutParams settingsParams = new FrameLayout.LayoutParams(
+            dp(activity, 48), dp(activity, 48), Gravity.END | Gravity.CENTER_VERTICAL);
+        bar.addView(settings, settingsParams);
+
+        LinearLayout center = column(activity);
+        center.setGravity(Gravity.CENTER_HORIZONTAL);
+        ImageView avatar = new ImageView(activity);
+        avatar.setImageResource(R.drawable.snowbaby);
+        avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        avatar.setContentDescription("Snowbaby");
+        LinearLayout.LayoutParams avatarParams = new LinearLayout.LayoutParams(
+            dp(activity, 58), dp(activity, 58));
+        center.addView(avatar, avatarParams);
+
+        String title = state.optString("title", "新对话");
+        titleView = text(activity, title, 15, INK, true);
+        titleView.setGravity(Gravity.CENTER);
+        titleView.setSingleLine(true);
+        titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        center.addView(titleView, margins(activity, -1, -2, 0, 2, 0, 0));
+        String subtext = state.optString("subtitle", "Python Agent");
+        TextView subtitle = text(activity, subtext, 10, MUTED, false);
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setSingleLine(true);
+        subtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        center.addView(subtitle);
+
+        FrameLayout.LayoutParams centerParams = new FrameLayout.LayoutParams(
+            dp(activity, 190), -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        centerParams.topMargin = dp(activity, 2);
+        bar.addView(center, centerParams);
+        page.addView(bar, new LinearLayout.LayoutParams(-1, height));
     }
 
     private static void sessions(Activity activity, JSONObject state) {

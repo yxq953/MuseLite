@@ -49,6 +49,7 @@ foreach ($density in @('mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi')) {
     }
 }
 Copy-Item (Join-Path $iconSource 'drawable\logo_foreground.png') (Join-Path $iconDestination 'drawable\logo_foreground.png') -Force
+Copy-Item (Join-Path $iconSource 'drawable\snowbaby.png') (Join-Path $iconDestination 'drawable\snowbaby.png') -Force
 $appGradle = Join-Path $ProjectRoot 'app\build.gradle'
 $manifest = Join-Path $main 'AndroidManifest.xml'
 $manifestText = Get-Content $manifest -Raw
