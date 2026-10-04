@@ -62,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
     private static View statusBarBackground;
 
     public static void setMuseLiteStatusBar(boolean chat) {
-        int color = chat ? Color.WHITE : Color.rgb(248, 250, 255);
+        int color = Color.WHITE;
         if (singletonThis != null) singletonThis.getWindow().setStatusBarColor(color);
         if (statusBarBackground != null) statusBarBackground.setBackgroundColor(color);
     }

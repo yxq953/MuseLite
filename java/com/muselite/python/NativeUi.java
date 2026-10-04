@@ -272,13 +272,15 @@ public final class NativeUi {
                 ensure(activity);
                 JSONObject state = new JSONObject(stateJson);
                 screen = state.optString("view", "sessions");
-                MainActivity.setMuseLiteStatusBar(screen.equals("chat"));
+                MainActivity.setMuseLiteStatusBar(screen.equals("chat") || screen.equals("sessions"));
                 NativeBridge.onScreenChanged(screen.equals("chat"));
                 currentSessionId = state.optString("session_id", "");
                 currentSessionTitle = state.optString("title", "定时任务");
                 host.removeAllViews();
                 page = column(activity);
-                page.setBackgroundColor(screen.equals("chat") ? WHITE : Color.TRANSPARENT);
+                host.setBackgroundColor(screen.equals("sessions") ? WHITE : CANVAS);
+                page.setBackgroundColor(screen.equals("chat") || screen.equals("sessions")
+                    ? WHITE : Color.TRANSPARENT);
                 host.addView(page, new FrameLayout.LayoutParams(-1, -1));
                 messageList = null;
                 messageScroll = null;
@@ -314,7 +316,7 @@ public final class NativeUi {
         }
         LinearLayout bar = row(activity);
         bar.setPadding(dp(activity, 18), dp(activity, 13), dp(activity, 18), dp(activity, 13));
-        bar.setBackgroundColor(screen.equals("chat") ? WHITE : CANVAS);
+        bar.setBackgroundColor(screen.equals("chat") || screen.equals("sessions") ? WHITE : CANVAS);
         bar.setElevation(dp(activity, 3));
         if (!screen.equals("sessions")) {
             HeaderIconView back = headerIcon(activity, true);
@@ -427,7 +429,7 @@ public final class NativeUi {
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
         FrameLayout hero = new FrameLayout(activity);
-        surface(hero, gradient(Color.rgb(255, 255, 255), Color.rgb(247, 248, 255),
+        surface(hero, gradient(WHITE, WHITE,
                                dp(activity, 26), Color.rgb(255, 255, 255)), 3);
         hero.setClipToOutline(true);
         View glow = new View(activity);
@@ -453,7 +455,7 @@ public final class NativeUi {
         LinearLayout heroContent = column(activity);
         heroContent.setPadding(dp(activity, 22), dp(activity, 23), dp(activity, 22), dp(activity, 25));
         heroContent.addView(eyebrow(activity, "MUSELITE  /  AI WORKSPACE", TEAL));
-        TextView headline = text(activity, "从一个想法，\n走向下一步。", 25, INK, true);
+        TextView headline = text(activity, "让灵感，落地为行动。", 25, INK, true);
         headline.setLineSpacing(dp(activity, 4), 1.0f);
         heroContent.addView(headline, margins(activity, -1, -2, 0, 13, 0, 0));
         TextView description = text(activity, "随时提问、整理思路，或交给 Agent 处理。", 13,
