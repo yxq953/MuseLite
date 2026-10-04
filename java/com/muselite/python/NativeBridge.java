@@ -278,8 +278,8 @@ public final class NativeBridge {
     }
 
     private static FrameLayout.LayoutParams miniParams(Activity activity) {
-        int width = Math.round(activity.getResources().getDisplayMetrics().widthPixels * 0.24f);
-        FrameLayout.LayoutParams result = new FrameLayout.LayoutParams(width, dp(activity, 68));
+        int width = Math.round(activity.getResources().getDisplayMetrics().widthPixels * 0.28f);
+        FrameLayout.LayoutParams result = new FrameLayout.LayoutParams(width, dp(activity, 78));
         result.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.LEFT;
         result.leftMargin = dp(activity, 12);
         result.bottomMargin = previewBottomMargin(activity);
@@ -292,8 +292,8 @@ public final class NativeBridge {
         View parent = (View) overlay.getParent();
         int[] location = new int[2];
         parent.getLocationOnScreen(location);
-        // Account for the panel's 4dp shadow inset to leave a visible 13dp gap.
-        return Math.max(0, location[1] + parent.getHeight() - anchorTop + dp(activity, 9));
+        // Account for the panel's 4dp shadow inset to leave a visible 12dp gap.
+        return Math.max(0, location[1] + parent.getHeight() - anchorTop + dp(activity, 8));
     }
 
     private static FrameLayout.LayoutParams expandedParams(Activity activity) {
@@ -373,7 +373,7 @@ public final class NativeBridge {
                 int pageWidth = activity.getResources().getDisplayMetrics().widthPixels;
                 float scale = (float) miniWidth / pageWidth;
                 webParams.width = pageWidth;
-                webParams.height = Math.round(dp(activity, 68) / scale);
+                webParams.height = Math.round(dp(activity, 78) / scale);
                 web.setPivotX(0f);
                 web.setPivotY(0f);
                 web.setScaleX(scale);
