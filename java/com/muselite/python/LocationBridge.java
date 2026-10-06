@@ -39,9 +39,14 @@ public final class LocationBridge {
             String action = req.optString("action", "get");
             if (!"get".equals(action)) throw new IllegalArgumentException("未知位置操作：" + action);
             require(activity);
-            Location location = current(activity);
+            Location location = lastKnown(activity);
+            String source = "last_known";
+            if (location == null) {
+                location = current(activity);
+                source = "current";
+            }
             if (location == null) throw new IllegalStateException("暂时无法获取当前位置，请确认定位服务已开启后重试");
-            return new JSONObject().put("result", result(location)).toString();
+            return new JSONObject().put("result", result(location, source)).toString();
         } catch (Exception e) {
             try { return new JSONObject().put("error", e.getMessage() == null ? e.toString() : e.getMessage()).toString(); }
             catch (Exception ignored) { return "{\"error\":\"location failure\"}"; }
@@ -75,7 +80,22 @@ public final class LocationBridge {
         return result[0];
     }
 
-    private static JSONObject result(Location location) throws Exception {
+    /** Return the freshest cached location from any enabled system provider. */
+    private static Location lastKnown(Activity activity) {
+        LocationManager manager = (LocationManager) activity.getSystemService(Activity.LOCATION_SERVICE);
+        if (manager == null) return null;
+        Location best = null;
+        for (String provider : new String[]{LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER}) {
+            try {
+                Location candidate = manager.getLastKnownLocation(provider);
+                if (candidate != null && (best == null || candidate.getTime() > best.getTime())) best = candidate;
+            } catch (SecurityException ignored) {}
+        }
+        return best;
+    }
+
+    private static JSONObject result(Location location, String source) throws Exception {
         JSONObject out = new JSONObject();
         out.put("latitude", location.getLatitude());
         out.put("longitude", location.getLongitude());
@@ -85,6 +105,8 @@ public final class LocationBridge {
         out.put("bearing_deg", location.hasBearing() ? location.getBearing() : JSONObject.NULL);
         out.put("timestamp_ms", location.getTime());
         out.put("provider", location.getProvider());
+        out.put("source", source);
+        out.put("age_ms", Math.max(0L, System.currentTimeMillis() - location.getTime()));
         return out;
     }
 }
