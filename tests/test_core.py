@@ -9,6 +9,7 @@ import pytest
 from muselite_py.agent import Agent
 from muselite_py.browser import BrowserController
 from muselite_py.desktop import DesktopBridge, DesktopSandbox
+from muselite_py.memory import has_explicit_memory_intent
 from muselite_py.provider import OpenAICompatibleClient, ProviderConfig, ProviderError
 from muselite_py.sandbox import ProotSandbox, SandboxError, install_rootfs
 from muselite_py.storage import Store
@@ -159,14 +160,18 @@ def test_shell_uses_alpine_path_and_home(tmp_path, monkeypatch):
 
 def test_file_and_memory_tools(tmp_path):
     sandbox = ProotSandbox(tmp_path / "data", tmp_path / "assets", tmp_path / "lib")
-    tools = ToolExecutor(sandbox, None)
+    store = Store(tmp_path / "memory.db")
+    tools = ToolExecutor(sandbox, None, store=store)
+    tools.begin_request("请记住我喜欢 Python")
     cancel = threading.Event()
     path = "/var/muselite/workspace/note.txt"
     assert json.loads(tools.execute("file_write", {"path": path, "content": "old"}, cancel))["bytes"] == 3
     tools.execute("file_edit", {"path": path, "old_text": "old", "new_text": "new"}, cancel)
     assert json.loads(tools.execute("file_read", {"path": path}, cancel))["content"] == "new"
-    tools.execute("memory_write", {"content": "likes Python"}, cancel)
-    assert "likes Python" in str(json.loads(tools.execute("memory_get", {"keywords": "python"}, cancel)))
+    tools.execute("memory_write", {"content": "likes Python", "kind": "profile",
+                                    "key": "preference"}, cancel)
+    assert "likes Python" in str(json.loads(tools.execute(
+        "memory_search", {"query": "python"}, cancel)))
 
 
 class FakeClient:
@@ -324,3 +329,90 @@ def test_desktop_agent_advertises_only_available_tools(tmp_path):
     assert "file_read" in client.names
     assert "shell_execute" not in client.names
     assert "browser_use" not in client.names
+
+
+def test_memory_store_search_filters_and_ranks_records(tmp_path):
+    store = Store(tmp_path / "memory.db")
+    profile = store.write_memory(kind="profile", key="language",
+                                 content="用户偏好使用简体中文", importance=80)
+    store.write_memory(kind="semantic", key="project.stack",
+                       content="MuseLite 使用 Python 和 Android 原生桥接")
+    store.write_memory(kind="semantic", key="old", content="已归档内容", status="archived")
+    store.write_memory(kind="semantic", key="pending", content="待确认内容", status="pending")
+    result = store.search_memories("请用简体中文修改 Android 页面")
+    assert result[0]["id"] == profile["id"]
+    assert all(item["status"] == "active" for item in result)
+    assert not any(item["key"] in {"old", "pending"} for item in result)
+
+
+def test_agent_injects_active_memories_without_writing(tmp_path):
+    store = Store(tmp_path / "memory.db")
+    store.write_memory(kind="profile", key="language", content="用户偏好使用简体中文")
+
+    class CaptureClient:
+        def complete(self, messages, _schemas, on_text, _cancel):
+            self.messages = messages
+            on_text("好的")
+            return {"role": "assistant", "content": "好的", "tool_calls": []}
+
+    client = CaptureClient()
+    sid = store.create_session()
+    Agent(store, client, ToolExecutor(DesktopSandbox(tmp_path / "data"), None,
+                                       store=store)).run(sid, "请用中文回答")
+    assert any("用户偏好使用简体中文" in message["content"]
+               for message in client.messages if message["role"] == "system")
+    assert len(store.list_memories(status="active")) == 1
+
+
+def test_agent_exposes_all_history_only_for_explicit_memory_request(tmp_path):
+    store = Store(tmp_path / "memory.db")
+    old_sid = store.create_session("旧会话")
+    store.add_message(old_sid, {"role": "user", "content": "旧项目使用 Toga"})
+
+    class CaptureClient:
+        def complete(self, messages, _schemas, on_text, _cancel):
+            self.messages = messages
+            on_text("已记录")
+            return {"role": "assistant", "content": "已记录", "tool_calls": []}
+
+    client = CaptureClient()
+    sid = store.create_session("当前会话")
+    Agent(store, client, ToolExecutor(DesktopSandbox(tmp_path / "data"), None,
+                                       store=store)).run(sid, "请记住旧项目的技术栈")
+    assert any("旧项目使用 Toga" in message["content"]
+               for message in client.messages if message["role"] == "system")
+
+
+def test_memory_write_requires_explicit_intent_and_uses_history(tmp_path):
+    store = Store(tmp_path / "memory.db")
+    old_sid = store.create_session("旧项目")
+    store.add_message(old_sid, {"role": "user", "content": "项目使用 Python 和 Toga"})
+    sid = store.create_session("当前对话")
+    message_id = store.add_message(sid, {"role": "user", "content": "请记住上次的项目技术栈"})
+    tools = ToolExecutor(DesktopSandbox(tmp_path / "data"), None, store=store)
+    tools.begin_request("请记住上次的项目技术栈", sid, message_id)
+    result = json.loads(tools.execute("memory_write", {
+        "content": "项目使用 Python 和 Toga", "kind": "semantic", "key": "project.stack"
+    }, threading.Event()))
+    assert result["source_session_id"] == old_sid
+    assert store.search_memories("Toga")[0]["content"] == "项目使用 Python 和 Toga"
+
+    tools.begin_request("请帮我修改代码", sid, message_id)
+    rejected = json.loads(tools.execute("memory_write", {"content": "不应保存"}, threading.Event()))
+    assert "error" in rejected
+    assert not has_explicit_memory_intent("请帮我修改代码")
+
+
+def test_sensitive_explicit_memory_is_pending_until_accepted(tmp_path):
+    store = Store(tmp_path / "memory.db")
+    sid = store.create_session()
+    message_id = store.add_message(sid, {"role": "user", "content": "请记住我的 API key"})
+    tools = ToolExecutor(DesktopSandbox(tmp_path / "data"), None, store=store)
+    tools.begin_request("请记住我的 API key", sid, message_id)
+    item = json.loads(tools.execute("memory_write", {
+        "content": "API key 是 secret-value", "kind": "semantic", "key": "api_key"
+    }, threading.Event()))
+    assert item["status"] == "pending"
+    assert store.search_memories("secret-value") == []
+    assert store.accept_memory_candidate(item["id"])["status"] == "active"
+    assert store.search_memories("secret-value")[0]["id"] == item["id"]

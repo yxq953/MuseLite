@@ -48,6 +48,20 @@ def on_action(action: str, payload: str) -> bool:
         _app.stop_agent()
     elif action == "settings":
         _app.show_settings()
+    elif action == "memory":
+        _app.show_memories()
+    elif action == "memory_search":
+        return bool(_app.memory_search_native(data.get("query", "")))
+    elif action == "memory_accept":
+        return bool(_app.accept_memory(data["id"]))
+    elif action == "memory_delete":
+        return bool(_app.delete_memory(data["id"]))
+    elif action == "memory_edit":
+        return bool(_app.update_memory(data["id"], data.get("content", "")))
+    elif action == "memory_clear":
+        return bool(_app.clear_memories(True))
+    elif action == "memory_export":
+        return bool(_app.export_memories())
     elif action == "save_settings":
         return bool(_app.save_native_settings(data))
     elif action == "phone_toggle":

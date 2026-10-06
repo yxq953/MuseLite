@@ -204,6 +204,7 @@ class MuseLiteApp(toga.App):
             "base_url": self.store.get_setting("base_url", "https://api.deepseek.com"),
             "model": self.store.get_setting("model", "deepseek-flash"),
             "vision": self.store.get_setting("vision", "1") == "1",
+            "memory_count": len(self.store.list_memories(status="active")),
             "phone": phone_state,
             "status": self.last_status, "status_error": self.status_error,
         }
@@ -218,6 +219,16 @@ class MuseLiteApp(toga.App):
             ],
         }
 
+    def _native_memories_state(self, query: str = "") -> dict:
+        return {
+            "view": "memory", "title": "长期记忆", "subtitle": "只保存你明确要求记住的内容",
+            "query": query,
+            "memories": self.store.search_memories(query, limit=50) if query else
+                        self.store.list_memories(status="active", include_expired=False),
+            "pending": self.store.list_memories(status="pending", include_expired=True),
+            "status": self.last_status, "status_error": self.status_error,
+        }
+
     def show_scheduled_tasks(self):
         self.current_view = "tasks"
         if self.is_android:
@@ -228,6 +239,92 @@ class MuseLiteApp(toga.App):
         if self.is_android:
             self.android.ui_show({"view": "task_add", "title": "添加定时任务",
                                   "subtitle": "设置执行时间和任务要求"})
+
+    def show_memories(self, query: str = ""):
+        self.current_view = "memory"
+        if self.is_android:
+            self.android.ui_show(self._native_memories_state(query))
+            return
+        content = self._screen("长期记忆", "只保存你明确要求记住的内容")
+        body = toga.Box(style=Pack(direction="column", gap=8, margin=15))
+        search = toga.TextInput(value=query, placeholder="搜索记忆", style=Pack(height=42))
+        body.add(search)
+        results = toga.Box(style=Pack(direction="column", gap=6))
+
+        def refresh():
+            self.show_memories(search.value or "")
+
+        body.add(button("搜索", refresh, height=42))
+        records = self.store.search_memories(search.value or "", limit=50) if (search.value or "").strip() else self.store.list_memories(status="active")
+        pending = self.store.list_memories(status="pending", include_expired=True)
+        if not records and not pending:
+            results.add(label("还没有长期记忆。请在聊天中明确说“请记住……”。", color=MUTED))
+        for item in records + pending:
+            status = "待确认" if item["status"] == "pending" else "已启用"
+            card = toga.Box(style=Pack(direction="column", gap=3, background_color=WHITE,
+                                       margin_bottom=5))
+            card.add(label(f"{status} · {item['kind']} · {item.get('key') or '未分类'}",
+                           size=11, color=ACCENT, weight="bold"))
+            card.add(label(item["content"], size=14, margin=(2, 0, 4, 0)))
+            actions = toga.Box(style=Pack(direction="row", gap=6))
+            if item["status"] == "pending":
+                actions.add(button("接受", lambda mid=item["id"]: (self.store.accept_memory_candidate(mid), refresh()), height=38))
+            actions.add(button("编辑", lambda mid=item["id"]: self.edit_memory_view(mid), height=38))
+            actions.add(button("删除", lambda mid=item["id"]: (self.store.delete_memory(mid), refresh()), height=38))
+            card.add(actions)
+            results.add(card)
+        body.add(toga.ScrollContainer(content=results, horizontal=False, style=Pack(flex=1)))
+        body.add(button("清空全部记忆", lambda: (self.clear_memories(), refresh()), height=44))
+        body.add(button("导出 Markdown", self.export_memories, height=44))
+        content.add(body)
+
+    def edit_memory_view(self, memory_id: str):
+        item = self.store.memory(memory_id)
+        if item is None:
+            return self.show_memories()
+        content = self._screen("编辑长期记忆", "修改后立即生效")
+        body = toga.Box(style=Pack(direction="column", gap=8, margin=15))
+        body.add(label(item.get("key") or "未分类", size=12, color=MUTED))
+        editor = toga.MultilineTextInput(value=item["content"], style=Pack(height=130))
+        body.add(editor)
+        body.add(button("保存", lambda: (self.store.update_memory(memory_id, content=editor.value), self.show_memories()), height=46))
+        content.add(body)
+
+    def memory_search_native(self, query: str) -> bool:
+        self.show_memories(str(query or ""))
+        return True
+
+    def accept_memory(self, memory_id: str) -> bool:
+        self.store.accept_memory_candidate(memory_id)
+        self.show_memories()
+        return True
+
+    def delete_memory(self, memory_id: str) -> bool:
+        self.store.delete_memory(memory_id)
+        self.show_memories()
+        return True
+
+    def clear_memories(self, confirmed: bool = False) -> bool:
+        if not confirmed and not getattr(self, "_memory_clear_armed", False):
+            self._memory_clear_armed = True
+            self._set_status("再次点击“清空全部记忆”确认")
+            return True
+        self.store.clear_memories()
+        self._memory_clear_armed = False
+        self.show_memories()
+        return True
+
+    def update_memory(self, memory_id: str, content: str) -> bool:
+        self.store.update_memory(memory_id, content=str(content or ""))
+        self.show_memories()
+        return True
+
+    def export_memories(self) -> bool:
+        path = self.sandbox.workspace / "muselite-memory.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.store.export_memories(markdown=True), encoding="utf-8")
+        self._set_status("记忆已导出到 /var/muselite/workspace/muselite-memory.md")
+        return True
 
     def save_scheduled_task(self, data: dict) -> bool:
         try:
@@ -629,7 +726,8 @@ class MuseLiteApp(toga.App):
                 self.phone_active = True
                 phone = PhoneController(self.android)
             self.active_agent = Agent(self.store, OpenAICompatibleClient(config),
-                                      ToolExecutor(self.sandbox, self.browser, phone))
+                                      ToolExecutor(self.sandbox, self.browser, phone,
+                                                   store=self.store))
         except Exception as exc:
             if self.phone_active:
                 self.android.phone_stop_task()
@@ -838,6 +936,7 @@ class MuseLiteApp(toga.App):
                 self._set_status(str(exc), error=True)
 
         fields.add(button("保存设置", save, height=48))
+        fields.add(button("管理长期记忆", self.show_memories, height=44))
         fields.add(status)
         fields.add(toga.Box(style=Pack(height=1, background_color=LINE,
                                        margin=(13, 0, 10, 0))))
