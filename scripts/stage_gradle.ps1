@@ -85,6 +85,16 @@ if (-not $manifestText.Contains('TaskBootReceiver')) {
     $manifestText = $manifestText.Replace('</application>', $bootReceiver + "`n    </application>")
     [System.IO.File]::WriteAllText($manifest, $manifestText, (New-Object System.Text.UTF8Encoding $false))
 }
+# Calendar permissions must be present even when the phone-operation services
+# were already staged.  The older conditional above only injects permissions
+# on a first-time service setup, which could leave them out of the final APK.
+foreach ($permission in @('READ_CALENDAR', 'WRITE_CALENDAR')) {
+    $permissionLine = '    <uses-permission android:name="android.permission.' + $permission + '" />'
+    if (-not $manifestText.Contains('android.permission.' + $permission)) {
+        $manifestText = $manifestText.Replace('<application', $permissionLine + "`n    <application")
+    }
+}
+[System.IO.File]::WriteAllText($manifest, $manifestText, (New-Object System.Text.UTF8Encoding $false))
 $strings = Join-Path $main 'res\values\strings.xml'
 $stringsText = Get-Content $strings -Raw
 $description = '    <string name="phone_accessibility_description">Allow MuseLite to read the screen and perform taps, typing, and swipes when enabled by the user.</string>'
