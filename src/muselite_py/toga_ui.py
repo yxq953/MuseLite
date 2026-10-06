@@ -728,7 +728,8 @@ class MuseLiteApp(toga.App):
             self.active_agent = Agent(self.store, OpenAICompatibleClient(config),
                                       ToolExecutor(self.sandbox, self.browser, phone,
                                                    store=self.store,
-                                                   calendar=self.android if self.is_android else None))
+                                                   calendar=self.android if self.is_android else None,
+                                                   location=self.android if self.is_android else None))
         except Exception as exc:
             if self.phone_active:
                 self.android.phone_stop_task()

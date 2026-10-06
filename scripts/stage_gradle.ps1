@@ -94,6 +94,12 @@ foreach ($permission in @('READ_CALENDAR', 'WRITE_CALENDAR')) {
         $manifestText = $manifestText.Replace('<application', $permissionLine + "`n    <application")
     }
 }
+foreach ($permission in @('ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION')) {
+    $permissionLine = '    <uses-permission android:name="android.permission.' + $permission + '" />'
+    if (-not $manifestText.Contains('android.permission.' + $permission)) {
+        $manifestText = $manifestText.Replace('<application', $permissionLine + "`n    <application")
+    }
+}
 [System.IO.File]::WriteAllText($manifest, $manifestText, (New-Object System.Text.UTF8Encoding $false))
 $strings = Join-Path $main 'res\values\strings.xml'
 $stringsText = Get-Content $strings -Raw

@@ -85,6 +85,9 @@ TOOL_SCHEMAS = [
         "limit": {"type": "integer", "minimum": 1}, "days": {"type": "integer", "minimum": 1},
         "today": {"type": "boolean"},
     }, ["action"]),
+    _schema("location", "Get the device's current location from Android. The first call requests location permission; the result includes latitude, longitude, accuracy, and available movement data.", {
+        "action": {"type": "string", "enum": ["get"]},
+    }, ["action"]),
 ]
 
 
@@ -92,13 +95,14 @@ class ToolExecutor:
     def __init__(self, sandbox: ProotSandbox, browser: BrowserController | None,
                  phone: PhoneController | None = None,
                  on_progress=None, store: Store | None = None,
-                 calendar=None):
+                 calendar=None, location=None):
         self.sandbox = sandbox
         self.browser = browser
         self.phone = phone
         self.on_progress = on_progress
         self.store = store
         self.calendar = calendar
+        self.location = location
         self.memory_writer = MemoryWriter(store) if store is not None else None
         self.memory_request = ""
         self.memory_session_id: str | None = None
@@ -125,6 +129,8 @@ class ToolExecutor:
             unavailable.add("phone_use")
         if self.calendar is None:
             unavailable.add("calendar")
+        if self.location is None:
+            unavailable.add("location")
         return [schema for schema in TOOL_SCHEMAS
                 if schema["function"]["name"] not in unavailable]
 
@@ -199,4 +205,8 @@ class ToolExecutor:
             if action == "calendars":
                 return normalized
             return self.calendar.calendar_call(action, normalized)
+        if name == "location":
+            if self.location is None:
+                raise RuntimeError("系统定位仅在 Android 中可用")
+            return self.location.location_call(str(args.get("action", "get")), args)
         raise ValueError(f"未知工具：{name}")
