@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import threading
-from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from .browser import ACTIONS, BrowserController
 from .phone import ACTIONS as PHONE_ACTIONS, PhoneController
 from .sandbox import ProotSandbox, SandboxError
+from .memory import MemoryWriter
+from .storage import Store
 
 
 def _schema(name: str, description: str, properties: dict, required: list[str]) -> dict:
@@ -34,12 +34,21 @@ TOOL_SCHEMAS = [
         "path": {"type": "string"}, "old_text": {"type": "string"},
         "new_text": {"type": "string"},
     }, ["path", "old_text", "new_text"]),
-    _schema("memory_write", "Save a persistent note for future sessions.", {
+    _schema("memory_write", "Save a persistent memory only when the user explicitly asked you to remember it.", {
         "content": {"type": "string"},
+        "kind": {"type": "string", "enum": ["profile", "semantic", "episodic"]},
+        "key": {"type": "string"}, "expires_at": {"type": "number"},
     }, ["content"]),
-    _schema("memory_get", "Search persistent notes by keywords.", {
-        "keywords": {"type": "string"},
+    _schema("memory_search", "Search active persistent memories relevant to a query.", {
+        "query": {"type": "string"}, "kinds": {"type": "array", "items": {"type": "string"}},
+        "limit": {"type": "integer"},
+    }, ["query"]),
+    _schema("memory_get", "Get one persistent memory by id, or search by legacy keywords.", {
+        "id": {"type": "string"}, "keywords": {"type": "string"},
     }, []),
+    _schema("memory_forget", "Delete one persistent memory by id.", {
+        "id": {"type": "string"},
+    }, ["id"]),
     _schema("browser_use", "Automate an Android WebView browser, with up to 3 tabs.", {
         "action": {"type": "string", "enum": list(ACTIONS)},
         "url": {"type": "string"}, "selector": {"type": "string"},
@@ -72,11 +81,22 @@ TOOL_SCHEMAS = [
 class ToolExecutor:
     def __init__(self, sandbox: ProotSandbox, browser: BrowserController | None,
                  phone: PhoneController | None = None,
-                 on_progress=None):
+                 on_progress=None, store: Store | None = None):
         self.sandbox = sandbox
         self.browser = browser
         self.phone = phone
         self.on_progress = on_progress
+        self.store = store
+        self.memory_writer = MemoryWriter(store) if store is not None else None
+        self.memory_request = ""
+        self.memory_session_id: str | None = None
+        self.memory_message_id: int | None = None
+
+    def begin_request(self, request: str, session_id: str | None = None,
+                      message_id: int | None = None) -> None:
+        self.memory_request = str(request or "")
+        self.memory_session_id = session_id
+        self.memory_message_id = message_id
 
     def _browser_progress(self, event: dict[str, Any]) -> None:
         if self.on_progress is not None:
@@ -125,24 +145,29 @@ class ToolExecutor:
             path.write_text(original.replace(old, args["new_text"], 1), encoding="utf-8")
             return {"path": args["path"], "edited": True}
         if name == "memory_write":
-            content = args["content"].strip()
-            if not content:
-                raise ValueError("记忆内容不能为空")
-            self.sandbox.memory.mkdir(parents=True, exist_ok=True)
-            path = self.sandbox.memory / (datetime.now().strftime("%Y-%m-%d") + ".md")
-            with path.open("a", encoding="utf-8") as output:
-                output.write(f"\n## {datetime.now().strftime('%H:%M')}\n{content}\n")
-            return {"saved": True, "path": "/var/muselite/memory/" + path.name}
-        if name == "memory_get":
-            keywords = args.get("keywords", "").casefold().split()
-            matches = []
-            for path in sorted(self.sandbox.memory.glob("*.md"), reverse=True):
-                body = path.read_text(encoding="utf-8")
-                if all(word in body.casefold() for word in keywords):
-                    matches.append({"file": path.name, "content": body[:8000]})
-                if len(matches) >= 10:
-                    break
-            return {"matches": matches}
+            content = str(args.get("content", "")).strip()
+            if self.memory_writer is None:
+                raise ValueError("长期记忆存储未配置")
+            return self.memory_writer.write_from_history(
+                request=self.memory_request, content=content,
+                kind=args.get("kind", "semantic"), key=args.get("key"),
+                source_session_id=self.memory_session_id,
+                source_message_id=self.memory_message_id,
+                expires_at=args.get("expires_at"),
+            )
+        if name in {"memory_search", "memory_get"}:
+            query = args.get("query", args.get("keywords", ""))
+            if self.store is not None:
+                if name == "memory_get" and args.get("id"):
+                    result = self.store.memory(str(args["id"]))
+                    return {"memory": result} if result else {"memory": None}
+                return {"matches": self.store.search_memories(
+                    str(query), kinds=args.get("kinds"), limit=args.get("limit", 12))}
+            return {"matches": []}
+        if name == "memory_forget":
+            if self.store is None:
+                raise ValueError("长期记忆存储未配置")
+            return {"deleted": self.store.delete_memory(str(args["id"]))}
         if name == "browser_use":
             if self.browser is None:
                 raise RuntimeError("浏览器仅在 Android 中可用")

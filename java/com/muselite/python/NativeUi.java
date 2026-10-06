@@ -136,7 +136,8 @@ public final class NativeUi {
 
     private static boolean whiteScreen() {
         return screen.equals("sessions") || screen.equals("settings") ||
-               screen.equals("tasks") || screen.equals("task_add") || screen.equals("chat");
+               screen.equals("memory") || screen.equals("tasks") ||
+               screen.equals("task_add") || screen.equals("chat");
     }
 
     private static TextView text(Context context, String value, int size, int color, boolean bold) {
@@ -297,6 +298,7 @@ public final class NativeUi {
                 header(activity, state);
                 if (screen.equals("chat")) chat(activity, state);
                 else if (screen.equals("settings")) settings(activity, state);
+                else if (screen.equals("memory")) memory(activity, state);
                 else if (screen.equals("tasks")) tasks(activity, state);
                 else if (screen.equals("task_add")) taskAdd(activity);
                 else sessions(activity, state);
@@ -325,7 +327,8 @@ public final class NativeUi {
         if (!screen.equals("sessions")) {
             HeaderIconView back = headerIcon(activity, true);
             back.setContentDescription("返回上一页");
-            back.setOnClickListener(view -> dispatch(screen.equals("task_add") ? "tasks" : "sessions", new JSONObject()));
+             back.setOnClickListener(view -> dispatch(screen.equals("task_add") ? "tasks" :
+                     (screen.equals("memory") ? "settings" : "sessions"), new JSONObject()));
             bar.addView(back, new LinearLayout.LayoutParams(dp(activity, 48), dp(activity, 48)));
         } else {
             TextView mark = text(activity, "✦", 24, TEAL, true);
@@ -956,6 +959,10 @@ public final class NativeUi {
         modelCard.addView(example, margins(activity, -1, -2, 0, 14, 0, 0));
         body.addView(modelCard, new LinearLayout.LayoutParams(-1, -2));
 
+        Button memories = button(activity, "管理长期记忆", false);
+        memories.setOnClickListener(view -> dispatch("memory", new JSONObject()));
+        body.addView(memories, margins(activity, -1, dp(activity, 48), 0, 0, 0, 16));
+
         LinearLayout phoneCard = column(activity);
         phoneCard.setPadding(dp(activity, 19), dp(activity, 20), dp(activity, 19), dp(activity, 21));
         surface(phoneCard, glass(activity, 22), 3);
@@ -1001,6 +1008,114 @@ public final class NativeUi {
             "启用手机操作需要系统无障碍授权；关闭开关会停止当前任务。",
             11, MUTED, false), margins(activity, -1, -2, 2, 13, 0, 0));
         body.addView(phoneCard, margins(activity, -1, -2, 0, 16, 0, 0));
+    }
+
+    private static void memory(Activity activity, JSONObject state) {
+        statusView = text(activity, "", 12, MUTED, false);
+        statusView.setPadding(dp(activity, 12), dp(activity, 10),
+                              dp(activity, 12), dp(activity, 10));
+        page.addView(statusView, margins(activity, -1, -2, 18, 12, 18, 0));
+        status(state.optString("status", ""), state.optBoolean("status_error", false));
+
+        ScrollView scroll = new ScrollView(activity);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout body = column(activity);
+        body.setPadding(dp(activity, 18), dp(activity, 22), dp(activity, 18), dp(activity, 32));
+        scroll.addView(body);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        body.addView(text(activity, "长期记忆", 22, INK, true));
+        body.addView(text(activity, "只保存你明确要求记住的内容。", 13, MUTED, false),
+                     margins(activity, -1, -2, 0, 12, 0, 16));
+
+        EditText query = field(activity, body, "搜索", state.optString("query", ""), false);
+        Button search = button(activity, "搜索记忆", true);
+        search.setOnClickListener(view -> {
+            JSONObject data = new JSONObject();
+            try { data.put("query", query.getText().toString()); } catch (JSONException ignored) {}
+            dispatch("memory_search", data);
+        });
+        body.addView(search, margins(activity, -1, dp(activity, 48), 0, 4, 0, 14));
+
+        JSONArray active = state.optJSONArray("memories");
+        JSONArray pending = state.optJSONArray("pending");
+        int count = 0;
+        if (active != null) count += memoryRows(activity, body, active, false);
+        if (pending != null) count += memoryRows(activity, body, pending, true);
+        if (count == 0) body.addView(text(activity,
+            "还没有长期记忆。请在聊天中明确说“请记住……”。", 13, MUTED, false),
+            margins(activity, -1, -2, 0, 8, 0, 12));
+
+        Button clear = button(activity, "清空全部记忆", false);
+        clear.setOnClickListener(view -> new AlertDialog.Builder(activity)
+            .setTitle("清空长期记忆")
+            .setMessage("所有已保存和待确认的记忆都会被删除。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("清空", (dialog, which) -> dispatch("memory_clear", new JSONObject()))
+            .show());
+        body.addView(clear, margins(activity, -1, dp(activity, 48), 0, 12, 0, 0));
+        Button export = button(activity, "导出 Markdown", false);
+        export.setOnClickListener(view -> dispatch("memory_export", new JSONObject()));
+        body.addView(export, margins(activity, -1, dp(activity, 48), 0, 8, 0, 0));
+    }
+
+    private static int memoryRows(Activity activity, LinearLayout body, JSONArray records,
+                                  boolean pending) {
+        int count = 0;
+        for (int i = 0; i < records.length(); i++) {
+            JSONObject item = records.optJSONObject(i);
+            if (item == null) continue;
+            count++;
+            LinearLayout card = column(activity);
+            card.setPadding(dp(activity, 15), dp(activity, 14), dp(activity, 15), dp(activity, 14));
+            surface(card, glass(activity, 15), 2);
+            String kind = item.optString("kind", "semantic");
+            String key = item.optString("key", "未分类");
+            card.addView(text(activity, (pending ? "待确认" : "已启用") + " · " + kind + " · " + key,
+                              11, pending ? RED : TEAL, true));
+            card.addView(text(activity, item.optString("content", ""), 14, INK, false),
+                         margins(activity, -1, -2, 0, 6, 0, 0));
+            LinearLayout actions = row(activity);
+            String id = item.optString("id", "");
+            if (pending) {
+                Button accept = button(activity, "接受", true);
+                accept.setOnClickListener(view -> {
+                    try { dispatch("memory_accept", new JSONObject().put("id", id)); }
+                    catch (JSONException ignored) {}
+                });
+                actions.addView(accept, new LinearLayout.LayoutParams(0, dp(activity, 44), 1));
+            }
+            Button edit = button(activity, "编辑", false);
+            edit.setOnClickListener(view -> {
+                EditText input = new EditText(activity);
+                input.setText(item.optString("content", ""));
+                input.setSelectAllOnFocus(false);
+                input.setSingleLine(false);
+                new AlertDialog.Builder(activity)
+                    .setTitle("编辑长期记忆")
+                    .setView(input)
+                    .setNegativeButton("取消", null)
+                    .setPositiveButton("保存", (dialog, which) -> {
+                        try {
+                            dispatch("memory_edit", new JSONObject()
+                                .put("id", id).put("content", input.getText().toString()));
+                        } catch (JSONException ignored) {}
+                    }).show();
+            });
+            LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(0, dp(activity, 44), 1);
+            editParams.leftMargin = dp(activity, 6);
+            actions.addView(edit, editParams);
+            Button delete = button(activity, "删除", false);
+            delete.setOnClickListener(view -> {
+                try { dispatch("memory_delete", new JSONObject().put("id", id)); }
+                catch (JSONException ignored) {}
+            });
+            LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(0, dp(activity, 44), 1);
+            deleteParams.leftMargin = dp(activity, 6);
+            actions.addView(delete, deleteParams);
+            card.addView(actions, margins(activity, -1, -2, 0, 8, 0, 0));
+            body.addView(card, margins(activity, -1, -2, 0, 0, 0, 10));
+        }
+        return count;
     }
 
     public static void updateChat(Activity activity, String stateJson) {
