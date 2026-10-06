@@ -959,10 +959,6 @@ public final class NativeUi {
         modelCard.addView(example, margins(activity, -1, -2, 0, 14, 0, 0));
         body.addView(modelCard, new LinearLayout.LayoutParams(-1, -2));
 
-        Button memories = button(activity, "管理长期记忆", false);
-        memories.setOnClickListener(view -> dispatch("memory", new JSONObject()));
-        body.addView(memories, margins(activity, -1, dp(activity, 48), 0, 0, 0, 16));
-
         LinearLayout phoneCard = column(activity);
         phoneCard.setPadding(dp(activity, 19), dp(activity, 20), dp(activity, 19), dp(activity, 21));
         surface(phoneCard, glass(activity, 22), 3);
@@ -1008,6 +1004,20 @@ public final class NativeUi {
             "启用手机操作需要系统无障碍授权；关闭开关会停止当前任务。",
             11, MUTED, false), margins(activity, -1, -2, 2, 13, 0, 0));
         body.addView(phoneCard, margins(activity, -1, -2, 0, 16, 0, 0));
+
+        LinearLayout memoryCard = column(activity);
+        memoryCard.setPadding(dp(activity, 19), dp(activity, 20), dp(activity, 19), dp(activity, 21));
+        surface(memoryCard, glass(activity, 22), 3);
+        memoryCard.addView(eyebrow(activity, "03  /  LONG-TERM MEMORY", TEAL));
+        memoryCard.addView(text(activity, "长期记忆", 18, INK, true),
+                           margins(activity, -1, -2, 0, 10, 0, 0));
+        memoryCard.addView(text(activity,
+                                "只保存你明确要求记住的内容。",
+                                12, MUTED, false), margins(activity, -1, -2, 0, 8, 0, 0));
+        Button memories = button(activity, "管理长期记忆", false);
+        memories.setOnClickListener(view -> dispatch("memory", new JSONObject()));
+        memoryCard.addView(memories, margins(activity, -1, dp(activity, 48), 0, 5, 0, 0));
+        body.addView(memoryCard, margins(activity, -1, -2, 0, 16, 0, 0));
     }
 
     private static void memory(Activity activity, JSONObject state) {
