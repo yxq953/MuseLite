@@ -17,6 +17,7 @@ class AndroidBridge:
         self.phone = jclass("com.muselite.python.PhoneBridge")
         self.ui = jclass("com.muselite.python.NativeUi")
         self.alarms = jclass("com.muselite.python.SessionAlarmScheduler")
+        self.calendar = jclass("com.muselite.python.CalendarBridge")
 
     def schedule_task(self, task: dict[str, Any]) -> None:
         self.alarms.scheduleTask(self.activity, task["id"], task["when_ms"],
@@ -94,6 +95,13 @@ class AndroidBridge:
 
     def ui_model_status(self, available: bool) -> None:
         self.ui.modelStatus(self.activity, available)
+
+    def calendar_call(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
+        request = json.dumps({"action": action, "params": params}, ensure_ascii=False)
+        response = json.loads(str(self.calendar.call(self.activity, request)))
+        if "error" in response:
+            raise RuntimeError(response["error"])
+        return response.get("result", response)
 
     def ui_phone_status(self, state: dict[str, Any]) -> None:
         self.ui.phoneState(json.dumps(state, ensure_ascii=False))

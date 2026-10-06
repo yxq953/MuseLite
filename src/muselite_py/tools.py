@@ -11,6 +11,7 @@ from .phone import ACTIONS as PHONE_ACTIONS, PhoneController
 from .sandbox import ProotSandbox, SandboxError
 from .memory import MemoryWriter
 from .storage import Store
+from .calendar_tools import normalize_calendar_args
 
 
 def _schema(name: str, description: str, properties: dict, required: list[str]) -> dict:
@@ -75,18 +76,29 @@ TOOL_SCHEMAS = [
         "package_name": {"type": "string"}, "present": {"type": "boolean"},
         "timeout_ms": {"type": "integer"},
     }, ["action"]),
+    _schema("calendar", "Read and manage events in the Android system calendar. Times use the device time zone and accept ISO 8601 or natural language.", {
+        "action": {"type": "string", "enum": ["list", "create", "update", "delete", "freebusy", "calendars"]},
+        "title": {"type": "string"}, "start": {"type": "string"}, "end": {"type": "string"},
+        "notes": {"type": "string"}, "location": {"type": "string"}, "all_day": {"type": "boolean"},
+        "alarm": {"type": "integer", "minimum": 0}, "calendar": {"type": "string"},
+        "calendar_id": {"type": "integer"}, "id": {"type": "integer"},
+        "limit": {"type": "integer", "minimum": 1}, "days": {"type": "integer", "minimum": 1},
+        "today": {"type": "boolean"},
+    }, ["action"]),
 ]
 
 
 class ToolExecutor:
     def __init__(self, sandbox: ProotSandbox, browser: BrowserController | None,
                  phone: PhoneController | None = None,
-                 on_progress=None, store: Store | None = None):
+                 on_progress=None, store: Store | None = None,
+                 calendar=None):
         self.sandbox = sandbox
         self.browser = browser
         self.phone = phone
         self.on_progress = on_progress
         self.store = store
+        self.calendar = calendar
         self.memory_writer = MemoryWriter(store) if store is not None else None
         self.memory_request = ""
         self.memory_session_id: str | None = None
@@ -111,6 +123,8 @@ class ToolExecutor:
             unavailable.add("browser_use")
         if self.phone is None:
             unavailable.add("phone_use")
+        if self.calendar is None:
+            unavailable.add("calendar")
         return [schema for schema in TOOL_SCHEMAS
                 if schema["function"]["name"] not in unavailable]
 
@@ -177,4 +191,12 @@ class ToolExecutor:
             if self.phone is None:
                 raise RuntimeError("手机操作未启用")
             return self.phone.call(args["action"], args, cancel)
+        if name == "calendar":
+            if self.calendar is None:
+                raise RuntimeError("系统日历仅在 Android 中可用")
+            action = str(args.get("action", ""))
+            normalized = normalize_calendar_args(action, args, self.calendar)
+            if action == "calendars":
+                return normalized
+            return self.calendar.calendar_call(action, normalized)
         raise ValueError(f"未知工具：{name}")
