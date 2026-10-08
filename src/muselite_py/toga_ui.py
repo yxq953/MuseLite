@@ -13,7 +13,7 @@ from toga.style import Pack
 from .agent import Agent
 from .android_bridge import AndroidBridge
 from .browser import BrowserController
-from .chat_view import render_markdown, render_messages, render_page
+from .chat_view import render_markdown, render_messages, render_page, render_native_blocks
 from .desktop import DesktopBridge, DesktopSandbox
 from .provider import OpenAICompatibleClient, ProviderConfig
 from .phone import PhoneController
@@ -177,11 +177,12 @@ class MuseLiteApp(toga.App):
                         if item["id"] == self.current_session), None)
         messages = []
         for item in self.display_messages[-80:]:
-            text = str(item.get("content") or "")[:8000]
+            text = str(item.get("content") or "")
             entry = {"role": item.get("role", "assistant"), "content": text,
                      "pending": bool(item.get("pending")), "name": item.get("name", "工具")}
             if entry["role"] == "assistant" and text:
                 entry["html"] = render_markdown(text)
+                entry["blocks"] = render_native_blocks(text)
             messages.append(entry)
         return {
             "view": "chat", "title": ((session or {}).get("title") or "新对话")[:28],

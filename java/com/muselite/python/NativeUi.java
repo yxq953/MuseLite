@@ -877,9 +877,14 @@ public final class NativeUi {
                                                Html.FROM_HTML_MODE_COMPACT));
                 } catch (Exception ignored) { body.setText(content); }
             }
-            card.addView(body, margins(activity, -1, -2, 0, 9, 0, 0));
+            JSONArray blocks = message.optJSONArray("blocks");
+            if (role.equals("assistant") && blocks != null && blocks.length() > 0) {
+                card.addView(ReplyView.render(activity, blocks), margins(activity, -1, -2, 0, 12, 0, 0));
+            } else {
+                card.addView(body, margins(activity, -1, -2, 0, 9, 0, 0));
+            }
             LinearLayout.LayoutParams cardParams = margins(activity, -1, -2,
-                                                           user ? 34 : 0, 0, user ? 0 : 34, 13);
+                                                           user ? 34 : 0, 0, role.equals("assistant") ? 0 : user ? 0 : 34, 18);
             messageList.addView(card, cardParams);
         }
         if (nearBottom) messageScroll.post(() -> messageScroll.fullScroll(View.FOCUS_DOWN));

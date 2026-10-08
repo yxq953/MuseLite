@@ -38,6 +38,68 @@ def render_markdown(source: str) -> str:
     return _markdown.render(source or "", {})
 
 
+def render_native_blocks(source: str) -> list[dict]:
+    """Preserve Markdown structure for the Android native reply renderer."""
+    tokens = _markdown.parse(source or "", {})
+    blocks: list[dict] = []
+    lists: list[dict] = []
+    quote_depth = 0
+    heading = 0
+    table = None
+    row = None
+    cell = None
+    for token in tokens:
+        kind = token.type
+        if kind in {"bullet_list_open", "ordered_list_open"}:
+            lists.append({"ordered": kind == "ordered_list_open",
+                          "number": int(token.attrGet("start") or 1), "pending": False})
+        elif kind in {"bullet_list_close", "ordered_list_close"}:
+            lists.pop()
+        elif kind == "list_item_open":
+            lists[-1]["pending"] = True
+        elif kind == "list_item_close":
+            lists[-1]["number"] += 1
+        elif kind == "blockquote_open":
+            quote_depth += 1
+        elif kind == "blockquote_close":
+            quote_depth -= 1
+        elif kind == "heading_open":
+            heading = int(token.tag[1:])
+        elif kind == "heading_close":
+            heading = 0
+        elif kind == "table_open":
+            table = {"type": "table", "rows": []}
+        elif kind == "table_close":
+            blocks.append(table)
+            table = None
+        elif kind == "tr_open":
+            row = []
+            table["rows"].append(row)
+        elif kind in {"th_open", "td_open"}:
+            cell = {"header": kind == "th_open", "html": ""}
+            row.append(cell)
+        elif kind == "inline":
+            markup = _markdown.renderer.renderInline(token.children or [], _markdown.options, {})
+            if table is not None:
+                cell["html"] = markup
+                continue
+            block = {"type": "heading" if heading else "quote" if quote_depth else "paragraph",
+                     "html": markup, "level": heading, "depth": len(lists)}
+            if lists:
+                item = lists[-1]
+                block["type"] = "list_item"
+                block["marker"] = (f"{item['number']}." if item["ordered"] else "•") if item["pending"] else ""
+                item["pending"] = False
+            blocks.append(block)
+        elif kind in {"fence", "code_block"}:
+            blocks.append({"type": "code", "text": token.content.rstrip("\n"),
+                           "language": token.info.strip().split()[0] if token.info.strip() else "",
+                           "depth": len(lists)})
+        elif kind == "hr":
+            blocks.append({"type": "divider"})
+    return blocks
+
+
 def render_messages(messages: list[dict]) -> str:
     if not messages:
         return '''<section class="welcome">
