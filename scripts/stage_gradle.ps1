@@ -36,6 +36,7 @@ $activityTemplate = Get-Content (Join-Path $source 'template\{{ cookiecutter.for
 $activityTemplate = $activityTemplate.Replace('{{ cookiecutter.package_name }}.{{ cookiecutter.module_name }}', 'com.muselite.python')
 [System.IO.File]::WriteAllText((Join-Path $main 'java\org\beeware\android\MainActivity.java'), $activityTemplate, (New-Object System.Text.UTF8Encoding $false))
 Copy-Item (Join-Path $source 'src\muselite_py\*.py') $pythonAppDestination -Force
+Copy-Item (Join-Path $source 'src\muselite_py\builtin_skills') $pythonAppDestination -Recurse -Force
 Copy-Item (Join-Path $source 'src\python\*.py') $pythonPackageDestination -Force
 Copy-Item (Join-Path $source 'res\xml\phone_accessibility.xml') $xmlDestination -Force
 Copy-Item (Join-Path $source 'vendor\assets\alpine-minirootfs.tar') $assetDestination -Force
@@ -138,6 +139,11 @@ $gradleText = $gradleText -replace 'versionName\s+"[^"]+"', "versionName `"$appV
 $proxyDeclaration = 'chaquopy.defaultConfig.staticProxy("toga_android.widgets.internal.webview")'
 if (-not $gradleText.Contains($proxyDeclaration)) {
     $gradleText += "`n" + $proxyDeclaration + "`n"
+}
+# SkillManager seeds bundled Markdown and references using filesystem paths.
+$skillExtraction = 'chaquopy.defaultConfig.extractPackages("muselite_py")'
+if (-not $gradleText.Contains($skillExtraction)) {
+    $gradleText += "`n" + $skillExtraction + "`n"
 }
 $gradleText = $gradleText -replace "com\.openminis", "com.muselite"
 [System.IO.File]::WriteAllText($appGradle, $gradleText, (New-Object System.Text.UTF8Encoding $false))

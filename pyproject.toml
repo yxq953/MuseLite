@@ -9,7 +9,7 @@ author = "MuseLite"
 formal_name = "MuseLite"
 description = "Python Android agent with a local Linux sandbox"
 sources = ["src/python", "src/muselite_py"]
-requires = ["toga-android==0.5.6", "markdown-it-py==4.2.0"]
+requires = ["toga-android==0.5.6", "markdown-it-py==4.2.0", "PyYAML==6.0.3"]
 
 [tool.briefcase.app.python.android]
 template = "template"
@@ -18,6 +18,7 @@ min_os_version = "30"
 android_manifest_application_attrs_extra_content = 'android:usesCleartextTraffic="true" android:extractNativeLibs="true"'
 build_gradle_extra_content = """
 chaquopy.defaultConfig.staticProxy("toga_android.widgets.internal.webview")
+chaquopy.defaultConfig.extractPackages("muselite_py")
 android {
     packaging {
         jniLibs {

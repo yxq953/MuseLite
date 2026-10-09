@@ -9,6 +9,7 @@ MuseLite is a Python-first AI workspace for Android. It combines an OpenAI-compa
 - API keys encrypted with the Android Keystore.
 - Scheduled prompts: type a prompt, choose a time, and let MuseLite send it in the selected conversation.
 - Agent tool loops for multi-step work, with progress and stop controls.
+- Reusable Skills with on-demand instructions, scripts, references, and templates; a built-in Skill Creator creates new skills through chat.
 - A persistent Alpine Linux sandbox powered by PRoot for shell commands and workspace files.
 - Browser tools for fetching pages, managing tabs, and saving useful results into the workspace.
 - Optional Android phone control through the accessibility service and a foreground task service.
@@ -74,6 +75,16 @@ Phone control is disabled by default. To enable it:
 4. Turn on **Allow Agent to operate the phone** in MuseLite.
 
 When enabled, the Agent can inspect the current screen, tap or long-press, type or clear text, swipe, press Back/Home/Recents, open an app by package name, and wait for a target to appear or disappear. Tasks run in a foreground service with a persistent notification and can be stopped from the notification or the chat. The Agent does not regain access after the process is killed.
+
+## Use Skills
+
+Open **Settings > Skill** to enable or disable skills and edit their files. Select a skill to edit its complete `SKILL.md`, references, or scripts. Binary templates show file information; **Add text file** creates a supporting resource. Saves validate the YAML `name` and `description`; the name must match the skill directory.
+
+Skill Creator is installed and enabled on first use. Tell the Agent, for example, “Create a skill that turns meeting notes into decisions and action items.” It loads Skill Creator, writes a complete skill directory, and enables the new skill immediately. Enabled skills can be selected automatically by their descriptions or explicitly with `$skill-name`. Disabling Skill Creator removes the creation tool from subsequent requests; it can be enabled again in Settings.
+
+Skills live in `/var/muselite/workspace/skills/<skill-name>/`. Only names and descriptions are initially disclosed to the model; `skill_load` retrieves full instructions and `skill_read` retrieves supporting text as needed. Scripts use the existing Android `shell_execute` sandbox; the desktop preview supports skill management and file access but cannot run Linux scripts.
+
+Each request uses a resource snapshot. User edits and switches apply to the next user message, preserving the workflow of a running task; a skill created by the Agent is added to its current request immediately. The built-in skill is seeded only when absent, so restarting or upgrading preserves user edits and switches. Skills supplement the current request and do not grant additional tools or permissions.
 
 ## Local sandbox
 

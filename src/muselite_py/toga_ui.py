@@ -20,6 +20,7 @@ from .phone import PhoneController
 from .sandbox import ProotSandbox
 from .storage import Store
 from .tools import ToolExecutor
+from .skills import SkillManager
 
 
 INK = "#173d44"
@@ -127,6 +128,8 @@ class MuseLiteApp(toga.App):
             self.sandbox = DesktopSandbox(self.home)
             self.browser = None
 
+        self.skills = SkillManager(self.sandbox, self.store)
+
         self.current_session = None
         self._pending_scheduled_tasks: list[str] = []
         self._scheduled_session_ids: set[str] = set()
@@ -207,6 +210,8 @@ class MuseLiteApp(toga.App):
             "vision": self.store.get_setting("vision", "1") == "1",
             "soul_configured": bool(self.store.get_setting("agent_soul", "").strip()),
             "memory_count": len(self.store.list_memories(status="active")),
+            "skill_count": sum(item["enabled"] and not item.get("error")
+                               for item in self.skills.list()),
             "phone": phone_state,
             "status": self.last_status, "status_error": self.status_error,
         }
@@ -217,6 +222,111 @@ class MuseLiteApp(toga.App):
             "soul": self.store.get_setting("agent_soul", ""),
             "status": self.last_status, "status_error": self.status_error,
         }
+
+    def _native_skills_state(self) -> dict:
+        return {
+            "view": "skills", "title": "Skill", "subtitle": "管理可复用的任务技能",
+            "skills": self.skills.list(),
+            "status": self.last_status, "status_error": self.status_error,
+        }
+
+    def _native_skill_state(self, name: str, path: str = "SKILL.md") -> dict:
+        item = self.skills.detail(name)
+        file = (self.skills.read(name, path) if path else
+                {"path": "", "content": "", "editable": True, "bytes": 0})
+        return {
+            "view": "skill_detail", "title": name, "subtitle": "文件与内容",
+            "skill": item, "file": file,
+            "status": self.last_status, "status_error": self.status_error,
+        }
+
+    def show_skills(self):
+        self.current_view = "skills"
+        if self.is_android:
+            self.android.ui_show(self._native_skills_state())
+            return
+        content = self._screen("Skill", "管理可复用的任务技能")
+        body = toga.Box(style=Pack(direction="column", gap=10, margin=15))
+        body.add(label("在对话中说“帮我创建一个……技能”，Agent 会调用 Skill Creator 创建。", size=12))
+        body.add(label("开启后可自动匹配任务，也可用 $skill-name 指定。修改与开关从下一条消息生效。",
+                       size=12, color=MUTED))
+        for item in self.skills.list():
+            name = item["name"]
+            row = toga.Box(style=Pack(direction="column", gap=6, background_color=WHITE,
+                                       margin_bottom=6))
+            row.add(button(name + (" · 内置" if item["builtin"] else ""),
+                           lambda name=name: self.show_skill(name), height=44))
+            row.add(label(item.get("error") or item["description"], size=12,
+                          color=ERROR if item.get("error") else MUTED))
+            switch = toga.Switch("启用", value=item["enabled"],
+                                 on_change=lambda widget, name=name:
+                                 self.toggle_skill(name, bool(widget.value)))
+            if item.get("error") and not item["enabled"]:
+                switch.enabled = False
+            row.add(switch)
+            body.add(row)
+        body.add(button("返回设置", self.show_settings, height=44))
+        content.add(toga.ScrollContainer(content=body, horizontal=False, style=Pack(flex=1)))
+
+    def show_skill(self, name: str, path: str = "SKILL.md") -> bool:
+        try:
+            state = self._native_skill_state(name, path)
+            self.current_view = "skill_detail"
+            if self.is_android:
+                self.android.ui_show(state)
+                return True
+            content = self._screen(name, "文件与内容")
+            body = toga.Box(style=Pack(direction="column", gap=8, margin=15))
+            body.add(label("修改与开关从下一条消息生效；运行中的任务继续使用原有版本。",
+                           size=12, color=MUTED))
+            if state["skill"].get("error"):
+                body.add(label(state["skill"]["error"], size=12, color=ERROR))
+            for file in state["skill"]["files"]:
+                relative = file["path"]
+                body.add(button(relative + f"  ({file['bytes']} 字节)",
+                                lambda relative=relative: self.show_skill(name, relative), height=36))
+            body.add(button("新增文本文件", lambda: self.show_skill(name, ""), height=40))
+            current = state["file"]
+            body.add(label("文件路径", size=12, color=MUTED))
+            path_input = toga.TextInput(value=path, placeholder="例如 references/guide.md",
+                                       style=Pack(height=42))
+            path_input.readonly = bool(path)
+            body.add(path_input)
+            if current["editable"]:
+                editor = toga.MultilineTextInput(value=current["content"], style=Pack(height=330))
+                body.add(editor)
+                body.add(button("保存内容", lambda: self.save_skill_file({
+                    "name": name, "path": path_input.value, "content": editor.value or ""}), height=48))
+            else:
+                body.add(label(f"模板或二进制资源 · {current['bytes']} 字节 · 文本编辑不可用",
+                               size=12, color=MUTED))
+            body.add(button("返回 Skill 列表", self.show_skills, height=44))
+            content.add(toga.ScrollContainer(content=body, horizontal=False, style=Pack(flex=1)))
+            return True
+        except Exception as exc:
+            self._set_status(str(exc), error=True)
+            return False
+
+    def toggle_skill(self, name: str, enabled: bool) -> bool:
+        try:
+            self.skills.set_enabled(name, enabled)
+            self._set_status("Skill 已" + ("开启" if enabled else "关闭") + "，从下一条消息生效")
+            self.show_skills()
+            return True
+        except Exception as exc:
+            self._set_status(str(exc), error=True)
+            return False
+
+    def save_skill_file(self, data: dict) -> bool:
+        try:
+            name, path = str(data["name"]), str(data["path"])
+            self.skills.save_file(name, path, data.get("content", ""))
+            self._set_status("Skill 内容已保存，从下一条消息生效")
+            self.show_skill(name, path)
+            return True
+        except Exception as exc:
+            self._set_status(str(exc), error=True)
+            return False
 
     def _native_tasks_state(self) -> dict:
         return {
@@ -737,6 +847,7 @@ class MuseLiteApp(toga.App):
             self.active_agent = Agent(self.store, OpenAICompatibleClient(config),
                                       ToolExecutor(self.sandbox, self.browser, phone,
                                                    store=self.store,
+                                                   skills=self.skills,
                                                    calendar=self.android if self.is_android else None,
                                                    location=self.android if self.is_android else None))
         except Exception as exc:
@@ -949,6 +1060,7 @@ class MuseLiteApp(toga.App):
         fields.add(button("保存设置", save, height=48))
         fields.add(button("编辑 Agent 人格", self.show_agent_soul, height=44))
         fields.add(button("管理长期记忆", self.show_memories, height=44))
+        fields.add(button("管理 Skill", self.show_skills, height=44))
         fields.add(status)
         fields.add(toga.Box(style=Pack(height=1, background_color=LINE,
                                        margin=(13, 0, 10, 0))))

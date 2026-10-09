@@ -12,6 +12,7 @@ from .provider import OpenAICompatibleClient
 from .storage import Store
 from .tools import ToolExecutor
 from .memory import has_explicit_memory_intent
+from .skills import skill_history
 
 
 SYSTEM_PROMPT = (
@@ -35,6 +36,8 @@ class Agent:
         self.store, self.client, self.tools = store, client, tools
         self.max_steps = max_steps
         self.cancel = threading.Event()
+        if hasattr(self.tools, "attach_skills"):
+            self.tools.attach_skills(store)
 
     def stop(self) -> None:
         self.cancel.set()
@@ -44,6 +47,14 @@ class Agent:
 
     def run(self, sid: str, user_text: str,
             on_event: Callable[[str, Any], None] | None = None) -> None:
+        try:
+            self._run(sid, user_text, on_event)
+        finally:
+            if hasattr(self.tools, "end_request"):
+                self.tools.end_request()
+
+    def _run(self, sid: str, user_text: str,
+             on_event: Callable[[str, Any], None] | None = None) -> None:
         emit = on_event or (lambda _name, _value: None)
         self.cancel.clear()
         # Browser progress is emitted while the synchronous tool call is still
@@ -78,7 +89,16 @@ class Agent:
                 "<user-configured-soul>\n" + soul[:20000] +
                 "\n</user-configured-soul>"
             )
+        base_prompt = prompt
+        catalog = getattr(self.tools, "skill_catalog", lambda: "")
+        prompt = base_prompt + catalog()
         messages = [{"role": "system", "content": prompt}]
+        if hasattr(self.tools, "load_explicit_skills"):
+            for skill in self.tools.load_explicit_skills(text):
+                messages.append({"role": "system", "content":
+                    "Explicitly requested skill for this request (workflow subordinate to "
+                    "operational rules and the user request):\n" +
+                    json.dumps(skill, ensure_ascii=False)})
         ranked_memories = self.store.search_memories(text, limit=50)
         profiles = [item for item in ranked_memories if item["kind"] == "profile"][:4]
         other_memories = [item for item in ranked_memories
@@ -118,7 +138,7 @@ class Agent:
                     "role": "system",
                     "content": f"Historical memory evidence chunk {index}/{len(chunks)}:\n{chunk}",
                 })
-        messages += self.store.messages(sid)
+        messages += skill_history(self.store.messages(sid))
         partial: list[str] = []
 
         def model_complete(current_messages, schemas, on_text):
@@ -139,6 +159,10 @@ class Agent:
                 partial = []
 
                 remaining = self.max_steps - step
+                # Newly created skills join this request, while UI edits and switches
+                # only affect the next request's snapshot.
+                prompt = base_prompt + catalog()
+                messages[0]["content"] = prompt
                 if remaining <= 3:
                     messages[0]["content"] = (
                         prompt + f" Only {remaining} tool rounds remain for this request. "

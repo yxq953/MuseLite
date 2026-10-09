@@ -137,7 +137,8 @@ public final class NativeUi {
     private static boolean whiteScreen() {
         return screen.equals("sessions") || screen.equals("settings") ||
                screen.equals("memory") || screen.equals("tasks") ||
-               screen.equals("task_add") || screen.equals("soul") || screen.equals("chat");
+               screen.equals("task_add") || screen.equals("soul") || screen.equals("chat") ||
+               screen.equals("skills") || screen.equals("skill_detail");
     }
 
     private static TextView text(Context context, String value, int size, int color, boolean bold) {
@@ -254,7 +255,8 @@ public final class NativeUi {
                     @Override public void handleOnBackPressed() {
                         if (screen.equals("sessions")) activity.finish();
                         else if (screen.equals("task_add")) dispatch("tasks", new JSONObject());
-                        else if (screen.equals("memory") || screen.equals("soul")) {
+                        else if (screen.equals("skill_detail")) dispatch("skills", new JSONObject());
+                        else if (screen.equals("memory") || screen.equals("soul") || screen.equals("skills")) {
                             dispatch("settings", new JSONObject());
                         } else dispatch("sessions", new JSONObject());
                     }
@@ -303,6 +305,8 @@ public final class NativeUi {
                 else if (screen.equals("settings")) settings(activity, state);
                 else if (screen.equals("memory")) memory(activity, state);
                 else if (screen.equals("soul")) soul(activity, state);
+                else if (screen.equals("skills")) skills(activity, state);
+                else if (screen.equals("skill_detail")) skillDetail(activity, state);
                 else if (screen.equals("tasks")) tasks(activity, state);
                 else if (screen.equals("task_add")) taskAdd(activity);
                 else sessions(activity, state);
@@ -331,8 +335,9 @@ public final class NativeUi {
         if (!screen.equals("sessions")) {
             HeaderIconView back = headerIcon(activity, true);
             back.setContentDescription("返回上一页");
-             back.setOnClickListener(view -> dispatch(screen.equals("task_add") ? "tasks" :
-                     ((screen.equals("memory") || screen.equals("soul")) ? "settings" : "sessions"),
+             back.setOnClickListener(view -> dispatch(screen.equals("skill_detail") ? "skills" :
+                     (screen.equals("task_add") ? "tasks" :
+                     ((screen.equals("memory") || screen.equals("soul") || screen.equals("skills")) ? "settings" : "sessions")),
                      new JSONObject()));
             bar.addView(back, new LinearLayout.LayoutParams(dp(activity, 48), dp(activity, 48)));
         } else {
@@ -1044,6 +1049,148 @@ public final class NativeUi {
         soul.setOnClickListener(view -> dispatch("soul", new JSONObject()));
         soulCard.addView(soul, margins(activity, -1, dp(activity, 48), 0, 5, 0, 0));
         body.addView(soulCard, margins(activity, -1, -2, 0, 16, 0, 0));
+
+        LinearLayout skillCard = column(activity);
+        skillCard.setPadding(dp(activity, 19), dp(activity, 20), dp(activity, 19), dp(activity, 21));
+        surface(skillCard, glass(activity, 22), 3);
+        skillCard.addView(eyebrow(activity, "05  /  SKILLS", TEAL));
+        skillCard.addView(text(activity, "Skill", 18, INK, true),
+                         margins(activity, -1, -2, 0, 10, 0, 0));
+        skillCard.addView(text(activity, "已开启 " + state.optInt("skill_count", 0) + " 个技能。通过对话创建，随时编辑或关闭。",
+                              12, MUTED, false), margins(activity, -1, -2, 0, 8, 0, 0));
+        Button manageSkills = button(activity, "管理 Skill", false);
+        manageSkills.setOnClickListener(view -> dispatch("skills", new JSONObject()));
+        skillCard.addView(manageSkills, margins(activity, -1, dp(activity, 48), 0, 5, 0, 0));
+        body.addView(skillCard, margins(activity, -1, -2, 0, 16, 0, 0));
+    }
+
+    private static LinearLayout skillBody(Activity activity, JSONObject state) {
+        ScrollView scroll = new ScrollView(activity);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout body = column(activity);
+        body.setPadding(dp(activity, 18), dp(activity, 20), dp(activity, 18), dp(activity, 32));
+        scroll.addView(body);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        statusView = text(activity, "", 12, MUTED, false);
+        body.addView(statusView, margins(activity, -1, -2, 0, 0, 0, 12));
+        status(state.optString("status", ""), state.optBoolean("status_error", false));
+        return body;
+    }
+
+    private static void skills(Activity activity, JSONObject state) {
+        LinearLayout body = skillBody(activity, state);
+        body.addView(text(activity, "可复用的任务技能", 22, INK, true));
+        body.addView(text(activity, "在对话中说“帮我创建一个……技能”，Agent 会调用 Skill Creator 创建。",
+                              13, MUTED, false), margins(activity, -1, -2, 0, 10, 0, 8));
+        body.addView(text(activity, "开启后自动匹配任务，也可用 $skill-name 指定。修改与开关从下一条消息生效。",
+                              12, MUTED, false), margins(activity, -1, -2, 0, 0, 0, 18));
+        JSONArray items = state.optJSONArray("skills");
+        if (items == null || items.length() == 0) {
+            body.addView(text(activity, "暂无 Skill", 15, MUTED, false));
+            return;
+        }
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item == null) continue;
+            String name = item.optString("name", "");
+            LinearLayout card = column(activity);
+            card.setPadding(dp(activity, 16), dp(activity, 14), dp(activity, 16), dp(activity, 16));
+            surface(card, glass(activity, 19), 2);
+            LinearLayout heading = row(activity);
+            TextView title = text(activity, name + (item.optBoolean("builtin", false) ? " · 内置" : ""),
+                                  16, INK, true);
+            title.setMaxLines(2);
+            heading.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+            CheckBox enabled = new CheckBox(activity);
+            enabled.setText("启用");
+            enabled.setTextColor(TEAL);
+            enabled.setChecked(item.optBoolean("enabled", false));
+            if (item.has("error") && !enabled.isChecked()) enabled.setEnabled(false);
+            boolean[] updating = {false};
+            enabled.setOnCheckedChangeListener((view, checked) -> {
+                if (updating[0]) return;
+                JSONObject data = new JSONObject();
+                try { data.put("name", name).put("enabled", checked); }
+                catch (JSONException ignored) {}
+                if (!dispatch("skill_toggle", data)) {
+                    updating[0] = true;
+                    enabled.setChecked(!checked);
+                    updating[0] = false;
+                }
+            });
+            heading.addView(enabled);
+            card.addView(heading);
+            card.addView(text(activity, item.has("error") ? item.optString("error") : item.optString("description"),
+                                  12, item.has("error") ? RED : MUTED, false),
+                         margins(activity, -1, -2, 0, 6, 0, 10));
+            Button edit = button(activity, "查看与编辑", false);
+            edit.setOnClickListener(view -> {
+                try { dispatch("skill_open", new JSONObject().put("name", name)); }
+                catch (JSONException ignored) {}
+            });
+            card.addView(edit, new LinearLayout.LayoutParams(-1, dp(activity, 44)));
+            body.addView(card, margins(activity, -1, -2, 0, 0, 0, 12));
+        }
+    }
+
+    private static void skillDetail(Activity activity, JSONObject state) {
+        LinearLayout body = skillBody(activity, state);
+        JSONObject skill = state.optJSONObject("skill");
+        JSONObject file = state.optJSONObject("file");
+        if (skill == null || file == null) return;
+        String name = skill.optString("name", "");
+        body.addView(text(activity, name, 21, INK, true));
+        body.addView(text(activity, "修改后保存，从下一条消息生效。运行中的任务继续使用原有版本。",
+                              12, MUTED, false), margins(activity, -1, -2, 0, 10, 0, 14));
+        if (skill.has("error")) body.addView(text(activity, skill.optString("error"), 12, RED, false));
+        body.addView(eyebrow(activity, "FILES", TEAL));
+        JSONArray files = skill.optJSONArray("files");
+        for (int i = 0; files != null && i < files.length(); i++) {
+            JSONObject resource = files.optJSONObject(i);
+            if (resource == null) continue;
+            String path = resource.optString("path", "");
+            Button choose = button(activity, path + "  ·  " + resource.optLong("bytes", 0) + " 字节", false);
+            choose.setAllCaps(false);
+            choose.setOnClickListener(view -> {
+                try { dispatch("skill_open", new JSONObject().put("name", name).put("path", path)); }
+                catch (JSONException ignored) {}
+            });
+            body.addView(choose, margins(activity, -1, -2, 0, 7, 0, 0));
+        }
+        Button add = button(activity, "新增文本文件", false);
+        add.setOnClickListener(view -> {
+            try { dispatch("skill_open", new JSONObject().put("name", name).put("path", "")); }
+            catch (JSONException ignored) {}
+        });
+        body.addView(add, margins(activity, -1, dp(activity, 44), 0, 7, 0, 14));
+
+        String relative = file.optString("path", "");
+        EditText pathInput = field(activity, body, "文件路径", relative, false);
+        pathInput.setHint("例如 references/guide.md");
+        pathInput.setEnabled(relative.isEmpty());
+        if (file.optBoolean("editable", false)) {
+            EditText editor = new EditText(activity);
+            editor.setText(file.optString("content", ""));
+            editor.setTextSize(14);
+            editor.setTextColor(INK);
+            editor.setTypeface(Typeface.MONOSPACE);
+            editor.setGravity(Gravity.TOP | Gravity.START);
+            editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+            editor.setPadding(dp(activity, 14), dp(activity, 14), dp(activity, 14), dp(activity, 14));
+            editor.setBackground(shape(WHITE, dp(activity, 14), LINE));
+            body.addView(editor, new LinearLayout.LayoutParams(-1, dp(activity, 360)));
+            Button save = button(activity, "保存内容", true);
+            save.setOnClickListener(view -> {
+                try {
+                    dispatch("skill_save", new JSONObject().put("name", name)
+                        .put("path", pathInput.getText().toString()).put("content", editor.getText().toString()));
+                } catch (JSONException ignored) {}
+            });
+            body.addView(save, margins(activity, -1, dp(activity, 50), 0, 14, 0, 0));
+        } else {
+            body.addView(text(activity, "模板或二进制资源 · " + file.optLong("bytes", 0) +
+                " 字节\n文本编辑不可用，Agent 可以通过资源路径使用此文件。", 13, MUTED, false));
+        }
     }
 
     private static void soul(Activity activity, JSONObject state) {

@@ -50,6 +50,14 @@ def on_action(action: str, payload: str) -> bool:
         _app.show_settings()
     elif action == "soul":
         _app.show_agent_soul()
+    elif action == "skills":
+        _app.show_skills()
+    elif action == "skill_open":
+        return bool(_app.show_skill(data["name"], data.get("path", "SKILL.md")))
+    elif action == "skill_toggle":
+        return bool(_app.toggle_skill(data["name"], bool(data["enabled"])))
+    elif action == "skill_save":
+        return bool(_app.save_skill_file(data))
     elif action == "save_soul":
         return bool(_app.save_native_soul(data))
     elif action == "clear_soul":

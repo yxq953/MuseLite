@@ -12,6 +12,7 @@ from .sandbox import ProotSandbox, SandboxError
 from .memory import MemoryWriter
 from .storage import Store
 from .calendar_tools import normalize_calendar_args
+from .skills import SkillManager
 
 
 def _schema(name: str, description: str, properties: dict, required: list[str]) -> dict:
@@ -22,6 +23,20 @@ def _schema(name: str, description: str, properties: dict, required: list[str]) 
 
 
 TOOL_SCHEMAS = [
+    _schema("skill_list", "List the skills available in this request (metadata only).", {}, []),
+    _schema("skill_load", "Load an enabled skill's full instructions and resource manifest before applying its workflow.", {
+        "name": {"type": "string"},
+    }, ["name"]),
+    _schema("skill_read", "Read a supporting text resource from a loaded skill, only when needed.", {
+        "name": {"type": "string"}, "path": {"type": "string"},
+    }, ["name", "path"]),
+    _schema("skill_create", "Create and immediately enable a reusable skill when the user requests it. Load skill-creator first. Existing names cannot be overwritten.", {
+        "content": {"type": "string", "description": "Complete SKILL.md with YAML name and description plus Markdown instructions."},
+        "files": {"type": "array", "items": {"type": "object", "properties": {
+            "path": {"type": "string"}, "content": {"type": "string"},
+            "encoding": {"type": "string", "enum": ["utf-8", "base64"]},
+        }, "required": ["path", "content"]}},
+    }, ["content"]),
     _schema("shell_execute", "Run a command in the Alpine Linux sandbox.", {
         "command": {"type": "string"}, "timeout": {"type": "integer"},
     }, ["command"]),
@@ -95,7 +110,7 @@ class ToolExecutor:
     def __init__(self, sandbox: ProotSandbox, browser: BrowserController | None,
                  phone: PhoneController | None = None,
                  on_progress=None, store: Store | None = None,
-                 calendar=None, location=None):
+                 calendar=None, location=None, skills: SkillManager | None = None):
         self.sandbox = sandbox
         self.browser = browser
         self.phone = phone
@@ -107,12 +122,42 @@ class ToolExecutor:
         self.memory_request = ""
         self.memory_session_id: str | None = None
         self.memory_message_id: int | None = None
+        self.skills = skills or (SkillManager(sandbox, store) if store is not None else None)
+        self.skill_snapshot = None
+
+    def attach_skills(self, store: Store) -> None:
+        if self.skills is None:
+            self.skills = SkillManager(self.sandbox, store)
+
+    def end_request(self) -> None:
+        if self.skill_snapshot is not None:
+            self.skill_snapshot.close()
+            self.skill_snapshot = None
+
+    def skill_catalog(self) -> str:
+        return self.skill_snapshot.catalog() if self.skill_snapshot is not None else ""
+
+    def load_explicit_skills(self, request: str) -> list[dict]:
+        import re
+        if self.skill_snapshot is None:
+            return []
+        names = dict.fromkeys(re.findall(r"(?<![\w$])\$([a-z0-9]+(?:-[a-z0-9]+)*)(?![\w-])", request))
+        results = []
+        for name in names:
+            try:
+                results.append(self.skill_snapshot.load(name))
+            except ValueError as exc:
+                results.append({"name": name, "error": str(exc)})
+        return results
 
     def begin_request(self, request: str, session_id: str | None = None,
                       message_id: int | None = None) -> None:
         self.memory_request = str(request or "")
         self.memory_session_id = session_id
         self.memory_message_id = message_id
+        self.end_request()
+        if self.skills is not None:
+            self.skill_snapshot = self.skills.begin_request()
 
     def _browser_progress(self, event: dict[str, Any]) -> None:
         if self.on_progress is not None:
@@ -131,6 +176,10 @@ class ToolExecutor:
             unavailable.add("calendar")
         if self.location is None:
             unavailable.add("location")
+        if self.skill_snapshot is None or not self.skill_snapshot.items:
+            unavailable.update({"skill_load", "skill_read", "skill_create", "skill_list"})
+        elif "skill-creator" not in self.skill_snapshot.items:
+            unavailable.add("skill_create")
         return [schema for schema in TOOL_SCHEMAS
                 if schema["function"]["name"] not in unavailable]
 
@@ -144,6 +193,22 @@ class ToolExecutor:
             return json.dumps({"error": str(exc)}, ensure_ascii=False)
 
     def _execute(self, name: str, args: dict[str, Any], cancel: threading.Event) -> Any:
+        if name.startswith("skill_"):
+            if self.skill_snapshot is None:
+                raise ValueError("本轮 Skill 未初始化")
+            if name == "skill_list":
+                return {"skills": [{"name": item["name"], "description": item["description"]}
+                                   for item in self.skill_snapshot.items.values()]}
+            if name == "skill_load":
+                return self.skill_snapshot.load(args["name"])
+            if name == "skill_read":
+                return self.skill_snapshot.read(args["name"], args["path"])
+            if name == "skill_create":
+                if "skill-creator" not in self.skill_snapshot.loaded:
+                    raise ValueError("请先调用 skill_load 加载已开启的 skill-creator")
+                item = self.skills.create(args["content"], args.get("files"))
+                self.skill_snapshot.add(item["name"])
+                return {"created": True, **item}
         if name == "shell_execute":
             return self.sandbox.execute(args["command"], args.get("timeout", 900), cancel)
         if name in {"file_read", "file_write", "file_edit"}:
