@@ -137,7 +137,7 @@ public final class NativeUi {
     private static boolean whiteScreen() {
         return screen.equals("sessions") || screen.equals("settings") ||
                screen.equals("memory") || screen.equals("tasks") ||
-               screen.equals("task_add") || screen.equals("chat");
+               screen.equals("task_add") || screen.equals("soul") || screen.equals("chat");
     }
 
     private static TextView text(Context context, String value, int size, int color, boolean bold) {
@@ -253,7 +253,10 @@ public final class NativeUi {
                 (AppCompatActivity) activity, new OnBackPressedCallback(true) {
                     @Override public void handleOnBackPressed() {
                         if (screen.equals("sessions")) activity.finish();
-                        else dispatch(screen.equals("task_add") ? "tasks" : "sessions", new JSONObject());
+                        else if (screen.equals("task_add")) dispatch("tasks", new JSONObject());
+                        else if (screen.equals("memory") || screen.equals("soul")) {
+                            dispatch("settings", new JSONObject());
+                        } else dispatch("sessions", new JSONObject());
                     }
                 });
         }
@@ -299,6 +302,7 @@ public final class NativeUi {
                 if (screen.equals("chat")) chat(activity, state);
                 else if (screen.equals("settings")) settings(activity, state);
                 else if (screen.equals("memory")) memory(activity, state);
+                else if (screen.equals("soul")) soul(activity, state);
                 else if (screen.equals("tasks")) tasks(activity, state);
                 else if (screen.equals("task_add")) taskAdd(activity);
                 else sessions(activity, state);
@@ -328,7 +332,8 @@ public final class NativeUi {
             HeaderIconView back = headerIcon(activity, true);
             back.setContentDescription("返回上一页");
              back.setOnClickListener(view -> dispatch(screen.equals("task_add") ? "tasks" :
-                     (screen.equals("memory") ? "settings" : "sessions"), new JSONObject()));
+                     ((screen.equals("memory") || screen.equals("soul")) ? "settings" : "sessions"),
+                     new JSONObject()));
             bar.addView(back, new LinearLayout.LayoutParams(dp(activity, 48), dp(activity, 48)));
         } else {
             TextView mark = text(activity, "✦", 24, TEAL, true);
@@ -1023,6 +1028,71 @@ public final class NativeUi {
         memories.setOnClickListener(view -> dispatch("memory", new JSONObject()));
         memoryCard.addView(memories, margins(activity, -1, dp(activity, 48), 0, 5, 0, 0));
         body.addView(memoryCard, margins(activity, -1, -2, 0, 16, 0, 0));
+
+        LinearLayout soulCard = column(activity);
+        soulCard.setPadding(dp(activity, 19), dp(activity, 20), dp(activity, 19), dp(activity, 21));
+        surface(soulCard, glass(activity, 22), 3);
+        soulCard.addView(eyebrow(activity, "04  /  AGENT SOUL", TEAL));
+        soulCard.addView(text(activity, "Agent 人格", 18, INK, true),
+                        margins(activity, -1, -2, 0, 10, 0, 0));
+        soulCard.addView(text(activity,
+                              state.optBoolean("soul_configured", false)
+                                  ? "已配置自定义 SOUL.md。"
+                                  : "尚未配置，Agent 将使用内置行为。",
+                              12, MUTED, false), margins(activity, -1, -2, 0, 8, 0, 0));
+        Button soul = button(activity, "编辑 Agent 人格", false);
+        soul.setOnClickListener(view -> dispatch("soul", new JSONObject()));
+        soulCard.addView(soul, margins(activity, -1, dp(activity, 48), 0, 5, 0, 0));
+        body.addView(soulCard, margins(activity, -1, -2, 0, 16, 0, 0));
+    }
+
+    private static void soul(Activity activity, JSONObject state) {
+        statusView = text(activity, "", 12, MUTED, false);
+        statusView.setPadding(dp(activity, 12), dp(activity, 10),
+                              dp(activity, 12), dp(activity, 10));
+        page.addView(statusView, margins(activity, -1, -2, 18, 12, 18, 0));
+        status(state.optString("status", ""), state.optBoolean("status_error", false));
+
+        ScrollView scroll = new ScrollView(activity);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout body = column(activity);
+        body.setPadding(dp(activity, 18), dp(activity, 22), dp(activity, 18), dp(activity, 32));
+        scroll.addView(body);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        body.addView(text(activity, "Agent 人格", 22, INK, true));
+        body.addView(text(activity,
+                         "编辑 SOUL.md，定义 Agent 的性格、价值观、语气和行为边界。",
+                         13, MUTED, false), margins(activity, -1, -2, 0, 8, 0, 16));
+
+        EditText editor = new EditText(activity);
+        editor.setText(state.optString("soul", ""));
+        editor.setTextSize(15);
+        editor.setTextColor(INK);
+        editor.setHintTextColor(MUTED);
+        editor.setHint("例如：你是一个简洁、诚实、注重行动的助手……");
+        editor.setGravity(Gravity.TOP | Gravity.START);
+        editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE |
+                            InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        editor.setPadding(dp(activity, 15), dp(activity, 14), dp(activity, 15), dp(activity, 14));
+        editor.setBackground(shape(WHITE, dp(activity, 14), LINE));
+        body.addView(editor, new LinearLayout.LayoutParams(-1, dp(activity, 360)));
+
+        Button save = button(activity, "保存人格", true);
+        save.setOnClickListener(view -> {
+            JSONObject data = new JSONObject();
+            try { data.put("soul", editor.getText().toString()); }
+            catch (JSONException ignored) {}
+            dispatch("save_soul", data);
+        });
+        body.addView(save, margins(activity, -1, dp(activity, 50), 0, 14, 0, 0));
+        Button clear = button(activity, "清空人格", false);
+        clear.setOnClickListener(view -> new AlertDialog.Builder(activity)
+            .setTitle("清空人格")
+            .setMessage("Agent 将恢复使用内置行为。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("清空", (dialog, which) -> dispatch("clear_soul", new JSONObject()))
+            .show());
+        body.addView(clear, margins(activity, -1, dp(activity, 48), 0, 0, 0, 0));
     }
 
     private static void memory(Activity activity, JSONObject state) {

@@ -69,6 +69,15 @@ class Agent:
             "remember, save, or not forget something. Never call memory_write for ordinary "
             "conversation, and never store secrets unless the user can review them."
         )
+        soul = self.store.get_setting("agent_soul", "").strip()
+        if soul:
+            prompt += (
+                "\n\nThe user-configured SOUL.md below defines the agent's personality, values, "
+                "tone, and behavior boundaries. Apply it as a system-level instruction "
+                "while continuing to follow the operational and safety rules above.\n"
+                "<user-configured-soul>\n" + soul[:20000] +
+                "\n</user-configured-soul>"
+            )
         messages = [{"role": "system", "content": prompt}]
         ranked_memories = self.store.search_memories(text, limit=50)
         profiles = [item for item in ranked_memories if item["kind"] == "profile"][:4]

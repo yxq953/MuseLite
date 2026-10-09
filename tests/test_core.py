@@ -201,6 +201,27 @@ def test_agent_persists_tool_cycle(tmp_path):
     assert events[-1][0] == "done"
 
 
+def test_agent_includes_user_configured_soul_in_system_prompt(tmp_path):
+    class CapturingClient:
+        def __init__(self):
+            self.messages = None
+
+        def complete(self, messages, _tools, on_text, _cancel):
+            self.messages = messages
+            on_text("完成")
+            return {"role": "assistant", "content": "完成", "tool_calls": []}
+
+    store = Store(tmp_path / "app.db")
+    store.set_setting("agent_soul", "# 性格\n保持简洁、诚实。")
+    sid = store.create_session()
+    client = CapturingClient()
+    Agent(store, client, ToolExecutor(DesktopSandbox(tmp_path / "data"), None)).run(
+        sid, "你好")
+    system = client.messages[0]["content"]
+    assert "<user-configured-soul>" in system
+    assert "保持简洁、诚实" in system
+
+
 def test_agent_summarizes_when_tool_round_budget_is_exhausted(tmp_path):
     class RepeatingClient:
         def __init__(self):

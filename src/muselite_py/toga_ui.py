@@ -205,8 +205,16 @@ class MuseLiteApp(toga.App):
             "base_url": self.store.get_setting("base_url", "https://api.deepseek.com"),
             "model": self.store.get_setting("model", "deepseek-flash"),
             "vision": self.store.get_setting("vision", "1") == "1",
+            "soul_configured": bool(self.store.get_setting("agent_soul", "").strip()),
             "memory_count": len(self.store.list_memories(status="active")),
             "phone": phone_state,
+            "status": self.last_status, "status_error": self.status_error,
+        }
+
+    def _native_soul_state(self) -> dict:
+        return {
+            "view": "soul", "title": "Agent 人格", "subtitle": "编辑 SOUL.md",
+            "soul": self.store.get_setting("agent_soul", ""),
             "status": self.last_status, "status_error": self.status_error,
         }
 
@@ -939,6 +947,7 @@ class MuseLiteApp(toga.App):
                 self._set_status(str(exc), error=True)
 
         fields.add(button("保存设置", save, height=48))
+        fields.add(button("编辑 Agent 人格", self.show_agent_soul, height=44))
         fields.add(button("管理长期记忆", self.show_memories, height=44))
         fields.add(status)
         fields.add(toga.Box(style=Pack(height=1, background_color=LINE,
@@ -986,6 +995,64 @@ class MuseLiteApp(toga.App):
             fields.add(button("刷新授权状态", update_phone_state, height=44))
         content.add(toga.ScrollContainer(content=fields, horizontal=False,
                                          style=Pack(flex=1)))
+
+    def show_agent_soul(self):
+        self.current_view = "soul"
+        if self.is_android:
+            self.android.ui_show(self._native_soul_state())
+            return
+        content = self._screen("Agent 人格", "编辑 SOUL.md")
+        fields = toga.Box(style=Pack(direction="column", gap=8, margin=15))
+        fields.add(label("人格指令", size=17, weight="bold", margin=(4, 0, 4, 0)))
+        fields.add(label("定义 Agent 的性格、价值观、语气和行为边界。留空表示使用内置行为。",
+                         size=12, color=MUTED))
+        soul = toga.MultilineTextInput(value=self.store.get_setting("agent_soul", ""),
+                                       style=Pack(flex=1, height=360))
+        fields.add(soul)
+        status = label("", size=12, color=MUTED, margin=(4, 0, 0, 0))
+
+        def save_soul():
+            try:
+                value = (soul.value or "").strip()
+                if len(value) > 20000:
+                    raise ValueError("人格内容不能超过 20000 个字符")
+                self.store.set_setting("agent_soul", value)
+                status.text = "✓ 人格设置已保存"
+                status.style.color = ACCENT
+                self._set_status("人格设置已保存")
+            except Exception as exc:
+                status.text = str(exc)
+                status.style.color = ERROR
+                self._set_status(str(exc), error=True)
+
+        def clear_soul():
+            soul.value = ""
+            save_soul()
+
+        fields.add(button("保存人格", save_soul, height=48))
+        fields.add(button("清空人格", clear_soul, height=44))
+        fields.add(status)
+        content.add(toga.ScrollContainer(content=fields, horizontal=False,
+                                         style=Pack(flex=1)))
+
+    def save_native_soul(self, data: dict) -> bool:
+        try:
+            value = str(data.get("soul", "")).strip()
+            if len(value) > 20000:
+                raise ValueError("人格内容不能超过 20000 个字符")
+            self.store.set_setting("agent_soul", value)
+            self._set_status("人格设置已保存")
+            self.android.ui_show(self._native_soul_state())
+            return True
+        except Exception as exc:
+            self._set_status(str(exc), error=True)
+            return False
+
+    def clear_native_soul(self) -> bool:
+        self.store.set_setting("agent_soul", "")
+        self._set_status("人格设置已清空")
+        self.android.ui_show(self._native_soul_state())
+        return True
 
     def save_native_settings(self, data: dict) -> bool:
         try:

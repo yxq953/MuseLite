@@ -48,6 +48,12 @@ def on_action(action: str, payload: str) -> bool:
         _app.stop_agent()
     elif action == "settings":
         _app.show_settings()
+    elif action == "soul":
+        _app.show_agent_soul()
+    elif action == "save_soul":
+        return bool(_app.save_native_soul(data))
+    elif action == "clear_soul":
+        return bool(_app.clear_native_soul())
     elif action == "memory":
         _app.show_memories()
     elif action == "memory_search":
