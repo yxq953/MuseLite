@@ -76,6 +76,44 @@ Phone control is disabled by default. To enable it:
 
 When enabled, the Agent can inspect the current screen, tap or long-press, type or clear text, swipe, press Back/Home/Recents, open an app by package name, and wait for a target to appear or disappear. Tasks run in a foreground service with a persistent notification and can be stopped from the notification or the chat. The Agent does not regain access after the process is killed.
 
+### Clipboard and chat reply recommendations
+
+For a temporary floating screenshot helper, say **“我需要这个聊天提示的功能，回复语气自然简洁”**
+in a MuseLite conversation. The Agent uses `chat_hint` to enable a draggable **帮我回复**
+button through the authorized accessibility service. Configure a vision-capable model and
+enable image input in Settings first; checking image input does not make a text-only model
+support images. Phone Control and the system accessibility service must be enabled.
+
+Switch to your chat app and tap the button. The overlay hides before taking one screenshot,
+then the configured model drafts a reply in your requested tone (also applying SOUL.md).
+Only a valid reply is copied; failures leave the clipboard unchanged. The screenshot is
+sent to your configured model provider, kept temporarily in the private cache, and deleted
+after loading. Screenshots are not saved in conversation history; the suggested text is.
+No automatic screenshots, clipboard polling, pasting, or sending occur.
+
+Switching apps preserves the button. Returning to MuseLite's conversation list, switching
+to another conversation, exiting the app, disabling Phone Control/accessibility, saying
+**“关闭聊天提示”**, or tapping **×** closes it. In-flight requests are invalidated so late
+results cannot overwrite the clipboard. Screenshots only include the visible screen;
+protected pages or unavailable model image input report errors.
+
+`clipboard_read` reads the first text item in Android's clipboard on request, and
+`clipboard_write` replaces it with up to 50,000 Unicode characters. Reading requires
+MuseLite to be in the foreground on Android 10+; denied reads and non-text clips
+return errors. Long reads report `truncated`; they do not imply the entire clip was read.
+No clipboard listener runs in the background. Writing can run during a phone task
+while the chat app is visible; it copies text without pasting or sending it.
+
+After enabling Phone Control, tell the Agent in the conversation input
+“读取我正在聊天的界面，推荐一个回复并复制到剪贴板”, then immediately switch to
+the conversation you want help with.
+`chat_read` waits up to 30 seconds for an external screen (optionally a specific app),
+and reads its visible accessibility text and positions. It excludes password fields
+and does not open, tap, scroll or edit the conversation. The Agent checks the screen
+is a chat, drafts a reply from the visible context, and copies the reply for you to paste.
+Only visible messages are available; hidden history or apps that do not expose text
+may require additional context or a screenshot with an image-capable model.
+
 ## Use Skills
 
 Open **Settings > Skill** to enable or disable skills and edit their files. Select a skill to edit its complete `SKILL.md`, references, or scripts. Binary templates show file information; **Add text file** creates a supporting resource. Saves validate the YAML `name` and `description`; the name must match the skill directory.

@@ -273,6 +273,7 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "onStop() complete");
     }
     protected void onDestroy() {
+        com.muselite.python.ReplyHintBridge.close();
         Log.d(TAG, "onDestroy() start");
         super.onDestroy();
         userCode("onDestroy");

@@ -23,6 +23,14 @@ class AppStub:
     def show_sessions(self):
         self.calls.append(("sessions",))
 
+    def request_chat_reply(self, data):
+        self.calls.append(("chat_hint_reply", data))
+        return True
+
+    def close_chat_hint(self, data):
+        self.calls.append(("chat_hint_close", data))
+        return True
+
 
 def test_native_actions_forward_the_prompt_and_session():
     app = AppStub()
@@ -38,3 +46,12 @@ def test_native_actions_forward_the_prompt_and_session():
         ("open", "session-1"),
         ("sessions",),
     ]
+
+
+def test_floating_reply_click_and_close_preserve_session_tokens():
+    app = AppStub()
+    native_ui_callbacks.bind(app)
+    click = {"session_id": "session-1", "token": "hint-1", "request_id": "click-1"}
+    assert native_ui_callbacks.on_action("chat_hint_reply", json.dumps(click))
+    assert native_ui_callbacks.on_action("chat_hint_close", '{"token":"hint-1"}')
+    assert app.calls == [("chat_hint_reply", click), ("chat_hint_close", {"token": "hint-1"})]

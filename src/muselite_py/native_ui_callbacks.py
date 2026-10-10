@@ -46,6 +46,10 @@ def on_action(action: str, payload: str) -> bool:
         return bool(_app.delete_scheduled_task(data["id"]))
     elif action == "stop":
         _app.stop_agent()
+    elif action == "chat_hint_reply":
+        return bool(_app.request_chat_reply(data))
+    elif action == "chat_hint_close":
+        return bool(_app.close_chat_hint(data))
     elif action == "settings":
         _app.show_settings()
     elif action == "soul":

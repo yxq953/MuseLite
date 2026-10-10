@@ -291,12 +291,24 @@ public final class NativeUi {
         }
     }
 
+    // Keep the conversation bound while visiting Settings or another Android app.
+    private static String replyConversation = "";
+    static boolean replyConversationIs(String id) { return !id.isEmpty() && id.equals(replyConversation); }
+
     public static void show(Activity activity, String stateJson) {
         onMain(activity, () -> {
             try {
                 ensure(activity);
                 JSONObject state = new JSONObject(stateJson);
                 screen = state.optString("view", "sessions");
+                if (screen.equals("sessions")) {
+                    replyConversation = "";
+                    ReplyHintBridge.close();
+                } else if (screen.equals("chat")) {
+                    String nextConversation = state.optString("session_id", "");
+                    if (!nextConversation.equals(replyConversation)) ReplyHintBridge.close();
+                    replyConversation = nextConversation;
+                }
                 MainActivity.setMuseLiteStatusBar(screen.equals("chat") || screen.equals("sessions"));
                 NativeBridge.onScreenChanged(screen.equals("chat"));
                 currentSessionId = state.optString("session_id", "");

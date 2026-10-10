@@ -20,6 +20,22 @@ class AndroidBridge:
         self.calendar = jclass("com.muselite.python.CalendarBridge")
         self.location = jclass("com.muselite.python.LocationBridge")
         self.documents = jclass("com.muselite.python.DocumentBridge")
+        self.clipboard = jclass("com.muselite.python.ClipboardBridge")
+        self.reply_hint = jclass("com.muselite.python.ReplyHintBridge")
+
+    def reply_hint_call(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
+        request = json.dumps({"action": action, "params": params}, ensure_ascii=False)
+        response = json.loads(str(self.reply_hint.call(self.activity, request)))
+        if "error" in response:
+            raise RuntimeError(response["error"])
+        return response["result"]
+
+    def clipboard_call(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
+        request = json.dumps({"action": action, "params": params}, ensure_ascii=False)
+        response = json.loads(str(self.clipboard.call(self.activity, request)))
+        if "error" in response:
+            raise RuntimeError(response["error"])
+        return response["result"]
 
     def documents_call(self, action: str, params: dict[str, Any]) -> dict[str, Any]:
         request = json.dumps({"action": action, "params": params}, ensure_ascii=False)

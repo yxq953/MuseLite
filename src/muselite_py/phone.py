@@ -8,7 +8,7 @@ from typing import Any
 
 ACTIONS = (
     "status", "inspect", "screenshot", "tap", "long_press", "type", "clear",
-    "swipe", "scroll", "press", "open_app", "wait",
+    "swipe", "scroll", "press", "open_app", "wait", "read_chat",
 )
 
 
@@ -22,6 +22,14 @@ class PhoneController:
             raise ValueError(f"不支持的手机操作：{action}")
         if cancel is not None and cancel.is_set():
             raise InterruptedError("手机操作已取消")
+        if action == "read_chat":
+            timeout = params.get("timeout_ms", 30000)
+            if type(timeout) is not int or not 200 <= timeout <= 30000:
+                raise ValueError("timeout_ms 必须在 200 到 30000 之间")
+            package = params.get("package_name", "")
+            if not isinstance(package, str):
+                raise ValueError("package_name 必须是文本")
+            params = {"timeout_ms": timeout, "package_name": package}
         if action in {"tap", "long_press"}:
             coordinate = "x" in params or "y" in params
             selectors = sum(key in params for key in ("node_id", "text", "resource_id"))

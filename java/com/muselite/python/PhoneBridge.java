@@ -15,7 +15,7 @@ public final class PhoneBridge {
     private static final String ENABLED = "enabled";
     private PhoneBridge() {}
 
-    private static boolean enabled(Activity activity) {
+    static boolean enabled(Activity activity) {
         return activity.getSharedPreferences(PREFS, 0).getBoolean(ENABLED, false);
     }
 
@@ -36,7 +36,7 @@ public final class PhoneBridge {
 
     public static void setEnabled(Activity activity, boolean value) {
         activity.getSharedPreferences(PREFS, 0).edit().putBoolean(ENABLED, value).apply();
-        if (!value) stopTask(activity);
+        if (!value) { ReplyHintBridge.close(); stopTask(activity); }
     }
 
     public static void openAccessibilitySettings(Activity activity) {
@@ -87,6 +87,25 @@ public final class PhoneBridge {
             JSONObject result;
             switch (action) {
                 case "inspect": result = service.inspect(); break;
+                case "read_chat":
+                    int chatTimeout = args.optInt("timeout_ms", 30000);
+                    if (chatTimeout < 200 || chatTimeout > 30000)
+                        throw new IllegalArgumentException("timeout_ms 必须在 200 到 30000 之间");
+                    String expectedPackage = args.optString("package_name", "");
+                    if (activity.getPackageName().equals(expectedPackage))
+                        throw new IllegalArgumentException("请指定外部聊天应用");
+                    long chatDeadline = android.os.SystemClock.uptimeMillis() + chatTimeout;
+                    JSONObject chat = null;
+                    String reason = "请打开聊天界面";
+                    while (android.os.SystemClock.uptimeMillis() < chatDeadline) {
+                        guard(activity);
+                        service = PhoneAccessibilityService.current();
+                        try { chat = service.readChat(expectedPackage); break; }
+                        catch (IllegalStateException unavailable) { reason = unavailable.getMessage(); }
+                        Thread.sleep(200);
+                    }
+                    if (chat == null) throw new IllegalStateException("读取聊天界面超时：" + reason);
+                    result = chat; break;
                 case "screenshot":
                     result = service.screenshot(new File(activity.getCacheDir(), "phone-screenshots")); break;
                 case "tap": result = service.tap(args, false); break;

@@ -22,6 +22,8 @@ from .storage import Store
 from .tools import ToolExecutor
 from .skills import SkillManager
 from .documents import DocumentController
+from .clipboard import ClipboardController
+from .chat_reply import ChatReplyController
 
 
 INK = "#173d44"
@@ -132,6 +134,8 @@ class MuseLiteApp(toga.App):
         self.skills = SkillManager(self.sandbox, self.store)
 
         self.current_session = None
+        self.chat_reply = (ChatReplyController(self.android, self.store, self._reply_client)
+                           if self.is_android else None)
         self._pending_scheduled_tasks: list[str] = []
         self._scheduled_session_ids: set[str] = set()
         self.current_view = "sessions"
@@ -557,6 +561,8 @@ class MuseLiteApp(toga.App):
             self.status_label.style.color = ERROR if error else MUTED
 
     def show_sessions(self):
+        if self.chat_reply is not None:
+            self.chat_reply.set_session(None)
         self._cleanup_empty_sessions()
         self.current_view = "sessions"
         if self.is_android:
@@ -651,6 +657,8 @@ class MuseLiteApp(toga.App):
     def open_session(self, sid):
         if self.busy and sid != self.current_session:
             return
+        if self.chat_reply is not None:
+            self.chat_reply.set_session(sid)
         if sid != self.current_session or not self.busy:
             self.display_messages = self._stored_display(sid)
             self._stream_index = None
@@ -852,7 +860,10 @@ class MuseLiteApp(toga.App):
                                                    calendar=self.android if self.is_android else None,
                                                    location=self.android if self.is_android else None,
                                                    documents=DocumentController(self.android, self.sandbox)
-                                                   if self.is_android else None))
+                                                   if self.is_android else None,
+                                                   clipboard=ClipboardController(self.android)
+                                                   if self.is_android else None,
+                                                   chat_reply=self.chat_reply))
         except Exception as exc:
             if self.phone_active:
                 self.android.phone_stop_task()
@@ -973,6 +984,42 @@ class MuseLiteApp(toga.App):
             if self.phone_active:
                 self.android.phone_stop_task()
             self.active_agent.stop()
+
+    def _reply_client(self):
+        return OpenAICompatibleClient(ProviderConfig(
+            self.store.get_setting("base_url", "https://api.deepseek.com"),
+            self.store.get_setting("model", "deepseek-flash"),
+            self.android.load_key(), self.store.get_setting("vision", "1") == "1"))
+
+    def request_chat_reply(self, data):
+        if (self.chat_reply is None or data.get("session_id") != self.current_session or
+                data.get("token") != self.chat_reply.token):
+            return False
+        def run():
+            try:
+                result = self.chat_reply.run(data)
+                self.loop.call_soon_threadsafe(self._chat_reply_finished, result)
+            except InterruptedError:
+                pass
+            except Exception as exc:
+                self.loop.call_soon_threadsafe(self._chat_reply_failed, data, str(exc))
+        threading.Thread(target=run, daemon=True).start()
+        return True
+
+    def _chat_reply_finished(self, result):
+        if result["session_id"] == self.current_session and not self.busy:
+            self.display_messages = self._stored_display(self.current_session)
+            self._set_status("推荐回复已复制，可粘贴后发送")
+            self._schedule_render()
+
+    def _chat_reply_failed(self, data, message):
+        if data.get("token") == self.chat_reply.token:
+            self._set_status(message, error=True)
+
+    def close_chat_hint(self, data):
+        if self.chat_reply is not None:
+            self.chat_reply.disable(data.get("token"))
+        return True
 
     def show_browser(self):
         loop = self.loop
@@ -1193,6 +1240,8 @@ class MuseLiteApp(toga.App):
         try:
             self.android.phone_set_enabled(enabled)
             if not enabled:
+                if self.chat_reply is not None:
+                    self.chat_reply.disable()
                 self.stop_agent()
             self.refresh_native_phone_status()
             return True
@@ -1207,6 +1256,8 @@ class MuseLiteApp(toga.App):
             self._set_status(str(exc), error=True)
 
     def on_exit(self):
+        if self.chat_reply is not None:
+            self.chat_reply.set_session(None)
         self._cleanup_empty_sessions()
         self.stop_agent()
         return True
