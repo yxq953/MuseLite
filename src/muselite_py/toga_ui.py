@@ -21,6 +21,7 @@ from .sandbox import ProotSandbox
 from .storage import Store
 from .tools import ToolExecutor
 from .skills import SkillManager
+from .documents import DocumentController
 
 
 INK = "#173d44"
@@ -849,7 +850,9 @@ class MuseLiteApp(toga.App):
                                                    store=self.store,
                                                    skills=self.skills,
                                                    calendar=self.android if self.is_android else None,
-                                                   location=self.android if self.is_android else None))
+                                                   location=self.android if self.is_android else None,
+                                                   documents=DocumentController(self.android, self.sandbox)
+                                                   if self.is_android else None))
         except Exception as exc:
             if self.phone_active:
                 self.android.phone_stop_task()

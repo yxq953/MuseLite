@@ -295,6 +295,7 @@ public class MainActivity extends AppCompatActivity {
     {
         Log.d(TAG, "onActivityResult() start");
         super.onActivityResult(requestCode, resultCode, data);
+        if (com.muselite.python.DocumentBridge.onActivityResult(this, requestCode, resultCode, data)) return;
         userCode("onActivityResult", requestCode, resultCode, data);
         Log.d(TAG, "onActivityResult() complete");
     }

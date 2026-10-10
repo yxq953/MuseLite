@@ -68,6 +68,20 @@ public final class NativeUi {
     private static View modelStatusDot;
     private static TextView statusView;
     private static TextView phoneStateView;
+    private static TextView documentStateView;
+
+    public static void documentState(String stateJson) {
+        if (owner == null) return;
+        owner.runOnUiThread(() -> {
+            if (!screen.equals("settings") || documentStateView == null) return;
+            try {
+                JSONObject state = new JSONObject(stateJson);
+                documentStateView.setText(state.optBoolean("configured")
+                    ? "保存位置：" + state.optString("path") : state.optString("message"));
+                documentStateView.setTextColor(state.optBoolean("configured") ? TEAL : MUTED);
+            } catch (JSONException ignored) {}
+        });
+    }
     private static EditText composerInput;
     private static Button sendButton;
     private static boolean agentBusy;
@@ -297,6 +311,7 @@ public final class NativeUi {
                 modelStatusDot = null;
                 statusView = null;
                 phoneStateView = null;
+                documentStateView = null;
                 composerInput = null;
                 sendButton = null;
                 Log.i(TAG, "screen=" + screen);
@@ -973,6 +988,31 @@ public final class NativeUi {
         example.setBackground(shape(WHITE, dp(activity, 12), LINE));
         modelCard.addView(example, margins(activity, -1, -2, 0, 14, 0, 0));
         body.addView(modelCard, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout documentCard = column(activity);
+        documentCard.setPadding(dp(activity, 19), dp(activity, 20), dp(activity, 19), dp(activity, 21));
+        surface(documentCard, glass(activity, 22), 3);
+        documentCard.addView(eyebrow(activity, "DOCUMENT STORAGE", TEAL));
+        documentCard.addView(text(activity, "文档保存目录", 18, INK, true),
+                             margins(activity, -1, -2, 0, 10, 0, 0));
+        documentCard.addView(text(activity, "选择手机上的文件夹。Agent 可以按你的要求列出文件、读取 Markdown 和文本，也可以将文档保存到这里。", 12, MUTED, false),
+                             margins(activity, -1, -2, 0, 8, 0, 0));
+        documentStateView = text(activity, "", 12, MUTED, false);
+        documentStateView.setTextIsSelectable(true);
+        documentCard.addView(documentStateView, margins(activity, -1, -2, 0, 8, 0, 0));
+        documentState(DocumentBridge.status(activity).toString());
+        Button chooseFolder = button(activity, "选择手机文件夹", true);
+        chooseFolder.setOnClickListener(view -> DocumentBridge.chooseFolder(activity));
+        documentCard.addView(chooseFolder, margins(activity, -1, dp(activity, 48), 0, 12, 0, 0));
+        Button testFolder = button(activity, "保存测试文档", false);
+        testFolder.setOnClickListener(view -> DocumentBridge.testFolder(activity));
+        documentCard.addView(testFolder, margins(activity, -1, dp(activity, 48), 0, 9, 0, 0));
+        Button clearFolder = button(activity, "断开保存目录", false);
+        clearFolder.setOnClickListener(view -> DocumentBridge.clearFolder(activity));
+        documentCard.addView(clearFolder, margins(activity, -1, dp(activity, 48), 0, 9, 0, 0));
+        documentCard.addView(text(activity, "目录授权会保留；同名文档会自动编号，不覆盖已有文件。", 11, MUTED, false),
+                             margins(activity, -1, -2, 0, 12, 0, 0));
+        body.addView(documentCard, margins(activity, -1, -2, 0, 16, 0, 0));
 
         LinearLayout phoneCard = column(activity);
         phoneCard.setPadding(dp(activity, 19), dp(activity, 20), dp(activity, 19), dp(activity, 21));

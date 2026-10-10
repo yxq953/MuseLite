@@ -88,6 +88,34 @@ Each request uses a resource snapshot. User edits and switches apply to the next
 
 ## Local sandbox
 
+### Read and save documents in a phone folder
+
+Open **Settings > 文档保存目录 > 选择手机文件夹**, select a folder in Android's folder picker,
+and confirm **Use this folder / Allow**. Choose a subfolder such as `Documents/MuseLite`;
+Android may prevent selecting the storage root, Download root, or Android/data.
+The folder authorization persists across app restarts and upgrades. The settings show
+the actual local path where available; other document providers use a folder name and content URI.
+Use **保存测试文档** to verify that a Markdown file appears in the selected folder.
+
+Tell the Agent, for example, “把这份总结保存到手机目录，文件名为 总结.md”.
+The `document_directory` tool checks the selected folder and `document_save` saves
+UTF-8 text or exports an existing sandbox file (including PDF or other binary files).
+Relative subfolders are supported and each file is limited to 25 MB. Existing files
+are preserved: duplicate names get a numbered suffix. Files are saved only when requested;
+ordinary `file_write` continues to use the app's private workspace.
+
+The Agent can also inspect this same authorized folder, including files created by
+other apps. Try “列出我设置目录里的文件” or “读取 报告/总结.md 并总结内容”.
+`document_list` lists files and subfolders with names, types, sizes and pagination;
+`document_read` reads UTF-8 Markdown, TXT, JSON and other text files up to 1 MiB.
+Long text is paginated by Unicode characters (including emoji), and the Agent follows
+`next_offset` to read the remaining content. PDF, Word, images, binary data and
+non-UTF-8 text are not supported for direct text reading. Reading never creates or
+changes files. Access is limited to the selected folder and its subfolders.
+
+If permission is revoked or the folder disappears, select it again in Settings.
+**断开保存目录** removes authorization without deleting exported files.
+
 The first `shell_execute` call unpacks the bundled Alpine root filesystem. The persistent paths are:
 
 - `/var/muselite/workspace` for user files.
